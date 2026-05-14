@@ -1,3 +1,4 @@
+// fix timezone v2
 const CLIENT_ID = process.env.PLAYTOMIC_CLIENT_ID
 const CLIENT_SECRET = process.env.PLAYTOMIC_CLIENT_SECRET
 const TENANT_ID = process.env.PLAYTOMIC_TENANT_ID
@@ -66,9 +67,10 @@ export async function getAvailability(daysAhead = 1) {
       // para capturar reservas nocturnas (ej. 19:00-23:00 México = 01:00-05:00 UTC siguiente día)
       const nextDateStr = new Date(date.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
+      // El día en México (UTC-6) empieza a las 06:00 UTC y termina a las 06:00 UTC del día siguiente
       const params = new URLSearchParams({
         tenant_id: TENANT_ID,
-        start_booking_date: `${dateStr}T00:00:00`,
+        start_booking_date: `${dateStr}T06:00:00`,
         end_booking_date: `${nextDateStr}T06:00:00`,
         sport_id: 'PADEL',
         size: 200
