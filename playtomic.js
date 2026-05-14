@@ -8,13 +8,12 @@ let tokenExpiry = 0
 async function getToken() {
   if (accessToken && Date.now() < tokenExpiry) return accessToken
 
-  const res = await fetch('https://api.playtomic.io/oauth/token', {
+  const res = await fetch('https://thirdparty.playtomic.io/api/v1/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      grant_type: 'client_credentials'
+      secret: CLIENT_SECRET
     })
   })
 
@@ -24,9 +23,9 @@ async function getToken() {
   }
 
   const data = await res.json()
-  accessToken = data.access_token
+  accessToken = data.token
   tokenExpiry = Date.now() + (data.expires_in - 60) * 1000
-  console.log('[Playtomic] Token obtenido, expira en', data.expires_in, 'seg')
+  console.log('[Playtomic] Token obtenido OK')
   return accessToken
 }
 
@@ -80,7 +79,7 @@ export async function getAvailability(daysAhead = 1) {
         size: 200
       })
 
-      const res = await fetch(`https://api.playtomic.io/v1/bookings?${params}`, {
+      const res = await fetch(`https://thirdparty.playtomic.io/api/v1/bookings?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
 
