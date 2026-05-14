@@ -68,14 +68,11 @@ export async function getAvailability(daysAhead = 1) {
     try {
       const token = await getToken()
 
-      // Obtener reservas del día para saber qué está ocupado
-      const from = `${dateStr}T00:00:00Z`
-      const to = `${dateStr}T23:59:59Z`
-
       const params = new URLSearchParams({
         tenant_id: TENANT_ID,
-        from,
-        to,
+        start_booking_date: `${dateStr}T00:00:00`,
+        end_booking_date: `${dateStr}T23:59:59`,
+        sport_id: 'PADEL',
         size: 200
       })
 
@@ -100,15 +97,25 @@ export async function getAvailability(daysAhead = 1) {
       const bookingList = Array.isArray(bookings) ? bookings : bookings.content || bookings.data || []
 
       for (const booking of bookingList) {
-        const startTime = booking.start_time || booking.startTime || booking.start_date
+        if (booking.is_canceled) continue
+        const startTime = booking.booking_start_date
         if (startTime) {
-          // Convertir UTC a hora México
+          // Convertir UTC a hora México (UTC-6)
           const d = new Date(startTime)
-          const mexicoMs = d.getTime() + (-6 * 60 * 60000) - d.getTimezoneOffset() * 60000
-          const mxDate = new Date(mexicoMs)
-          const h = mxDate.getHours().toString().padStart(2, '0')
-          const m = mxDate.getMinutes().toString().padStart(2, '0')
-          occupied.add(`${h}:${m}`)
+          const mxMs = d.getTime() + (-6 * 60 * 60000)
+          const mxDate = new Date(mxMs)
+          const h = mxDate.getUTCHours().toString().padStart(2, '0')
+          const m = mxDate.getUTCMinutes().toString().padStart(2, '0')
+          // Marcar todo el bloque como ocupado según duración
+          const durationMs = booking.duration / 1000 // microseconds to ms
+          const slots = Math.ceil(durationMs / (30 * 60 * 1000))
+          for (let s = 0; s < slots; s++) {
+            const slotMs = mxMs + s * 30 * 60 * 1000
+            const sd = new Date(slotMs)
+            const sh = sd.getUTCHours().toString().padStart(2, '0')
+            const sm = sd.getUTCMinutes().toString().padStart(2, '0')
+            occupied.add(`${sh}:${sm}`)
+          }
         }
       }
 
