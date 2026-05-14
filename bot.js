@@ -61,7 +61,9 @@ REGLAS DE CONVERSACIÓN:
 6. Si no sabes algo, manda al contacto del club: +52 33 3486 8183
 7. Respuestas cortas y naturales, máximo 4-5 líneas, sin listas ni asteriscos.
 8. NUNCA inventes disponibilidad. Si no tienes datos reales de Playtomic en este mensaje, di que vas a consultar o manda al cliente directamente a Playtomic.
-9. La zona horaria es Guadalajara (CDT, UTC-6)`
+9. La zona horaria es Guadalajara (CDT, UTC-6)
+10. Cuando alguien diga una hora sin AM/PM, usa el contexto: si ya hablaron de tarde/noche, asume PM. Nunca confundas 9pm con 9am.
+11. La disponibilidad viene en formato "HH:MM (Cancha X, Cancha Y)" — cuando pregunten qué cancha hay a cierta hora, responde con las canchas específicas de ese slot.`
 
 export async function handleIncoming(from, name, userMessage) {
   if (!conversations.has(from)) conversations.set(from, [])
