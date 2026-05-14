@@ -10,7 +10,6 @@ app.get('/webhook', (req, res) => {
   const token = req.query['hub.verify_token']
   const challenge = req.query['hub.challenge']
   if (mode === 'subscribe' && token === process.env.WEBHOOK_VERIFY_TOKEN) {
-    console.log('Webhook verificado')
     res.status(200).send(challenge)
   } else {
     res.sendStatus(403)
@@ -38,5 +37,9 @@ app.post('/webhook', async (req, res) => {
 app.get('/', (req, res) => res.send('Urban Padel Bot corriendo'))
 
 const PORT = process.env.PORT || 3000
-const httpServer = initDashboard(app, conversations)
-httpServer.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`))
+
+// initDashboard es async, hay que esperarla
+;(async () => {
+  const httpServer = await initDashboard(app, conversations)
+  httpServer.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`))
+})()
