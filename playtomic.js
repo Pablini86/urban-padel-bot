@@ -28,11 +28,14 @@ async function fetchDay(dateStr) {
   if (!res.ok) return []
   const data = await res.json()
 
-  // Recolectar todos los slots únicos de todas las canchas
+  // Recolectar todos los slots únicos, filtrar madrugada (antes de 7am)
   const allSlots = new Set()
   for (const resource of (Array.isArray(data) ? data : [])) {
     for (const slot of (resource.slots || [])) {
-      if (slot.start_time) allSlots.add(slot.start_time.slice(0, 5))
+      if (slot.start_time) {
+        const hour = parseInt(slot.start_time.slice(0, 2))
+        if (hour >= 7) allSlots.add(slot.start_time.slice(0, 5))
+      }
     }
   }
 
