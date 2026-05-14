@@ -9,7 +9,7 @@ const conversations = new Map()
 
 const SYSTEM_PROMPT = `Eres el asistente virtual de Urban Padel, un club de pádel ubicado en Guadalajara, México.
 
-Tu nombre es "Urbi" y tu personalidad es amable, eficiente y con buen humor deportivo.
+Tu personalidad es amable, eficiente y con buen humor deportivo.
 
 INFORMACIÓN DEL CLUB:
 - Nombre: Urban Padel
