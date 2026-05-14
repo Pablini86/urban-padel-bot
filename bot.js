@@ -1,9 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getAvailability } from './playtomic.js'
 import { sendWhatsApp } from './whatsapp.js'
- 
+
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-const conversations = new Map()
+export const conversations = new Map()
 
 const SYSTEM_PROMPT = `Eres el asistente virtual de Urban Pádel Life, un club de pádel en Guadalajara, México.
 
@@ -72,6 +72,17 @@ export async function handleIncoming(from, name, userMessage) {
   history.push({ role: 'user', content: userMessage })
   if (history.length > 12) history.splice(0, history.length - 12)
 
+  // Notificar al dashboard
+  try {
+    const { dashboardIO, humanControl } = await import('./dashboard/server.js')
+    if (dashboardIO) dashboardIO.emit('new_message', { phone: from, role: 'user', content: userMessage, name })
+    // Si un humano tiene el control, no responder con bot
+    if (humanControl?.has(from)) {
+      console.log(`[Bot] ${from} está en control humano, no respondo`)
+      return
+    }
+  } catch (e) { /* dashboard no disponible */ }
+
   const fullContext = history.map(m => m.content).join(' ').toLowerCase()
   const wantsAvailability = /dispon|reserv|jugar|cancha|horario|slot|libre/.test(fullContext)
 
@@ -105,5 +116,12 @@ INSTRUCCIÓN CRÍTICA SOBRE DISPONIBILIDAD:
   history.push({ role: 'assistant', content: reply })
 
   await sendWhatsApp(from, reply)
+
+  // Notificar al dashboard la respuesta del bot
+  try {
+    const { dashboardIO } = await import('./dashboard/server.js')
+    if (dashboardIO) dashboardIO.emit('new_message', { phone: from, role: 'assistant', content: reply })
+  } catch (e) { /* dashboard no disponible */ }
+
   console.log(`[Bot -> ${name}]: ${reply}`)
 }

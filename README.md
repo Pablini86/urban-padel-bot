@@ -1,6 +1,5 @@
 # Urban Padel Bot
 
- 
 Bot de WhatsApp con IA para Urban Padel. Responde preguntas del club y consulta disponibilidad en Playtomic en tiempo real.
 
 ## Variables de entorno requeridas

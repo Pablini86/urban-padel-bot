@@ -1,10 +1,10 @@
 import express from 'express'
-import { handleIncoming } from './bot.js'
+import { handleIncoming, conversations } from './bot.js'
+import { initDashboard } from './dashboard/server.js'
 
 const app = express()
 app.use(express.json())
 
-// Meta verifica que el servidor es tuyo
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode']
   const token = req.query['hub.verify_token']
@@ -17,23 +17,17 @@ app.get('/webhook', (req, res) => {
   }
 })
 
-// Recibe mensajes entrantes de WhatsApp
 app.post('/webhook', async (req, res) => {
-  res.sendStatus(200) // responde rápido a Meta
-
+  res.sendStatus(200)
   const entry = req.body.entry?.[0]
   const change = entry?.changes?.[0]
   const value = change?.value
   const message = value?.messages?.[0]
-
   if (!message || message.type !== 'text') return
-
   const from = message.from
   const text = message.text.body
   const name = value.contacts?.[0]?.profile?.name || 'Cliente'
-
   console.log(`[${name}] ${from}: ${text}`)
-
   try {
     await handleIncoming(from, name, text)
   } catch (err) {
@@ -44,4 +38,5 @@ app.post('/webhook', async (req, res) => {
 app.get('/', (req, res) => res.send('Urban Padel Bot corriendo'))
 
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`))
+const httpServer = initDashboard(app, conversations)
+httpServer.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`))
