@@ -2,417 +2,503 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Urban Pádel — Panel de Mensajes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Urban Pádel — Mensajes</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;--bg4:#222;
+  --border:#252525;--border2:#2e2e2e;
+  --text:#f5f5f5;--text2:#999;--text3:#666;
+  --green:#22c55e;--green2:#16a34a;
+  --orange:#f97316;--red:#ef4444;--blue:#3b82f6;
+  --purple:#a855f7;--yellow:#eab308;
+  --r:14px;--rs:8px;
+}
+html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* LOGIN */
+#login{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg)}
+.login-card{width:min(380px,90vw);padding:40px 32px;background:var(--bg2);border:1px solid var(--border);border-radius:20px}
+.lc-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.lc-dot{width:32px;height:32px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
+.lc-name{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.lc-sub{font-size:12px;color:var(--text2);margin-top:1px}
+.lc-title{font-size:22px;font-weight:700;margin-bottom:24px}
+.lc-field{width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text);font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;transition:border-color .2s}
+.lc-field:focus{border-color:var(--green)}
+.lc-btn{width:100%;padding:13px;background:var(--green);color:#000;border:none;border-radius:var(--rs);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;transition:background .2s}
+.lc-btn:hover{background:var(--green2)}
+.lc-err{color:var(--red);font-size:13px;margin-top:8px;display:none}
 
-  :root {
-    --bg: #0f0f0f;
-    --bg2: #181818;
-    --bg3: #222;
-    --border: #2a2a2a;
-    --text: #f0f0f0;
-    --text2: #888;
-    --accent: #00e676;
-    --accent2: #00b853;
-    --human: #ff6b35;
-    --bot: #00e676;
-    --radius: 12px;
-  }
+/* APP LAYOUT */
+#app{display:none;height:100vh;flex-direction:column}
+.topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+.topbar-logo{font-size:13px;font-weight:700;letter-spacing:-.3px}
+.topbar-dot{width:8px;height:8px;background:var(--green);border-radius:50%}
+.topbar-agent{font-size:12px;color:var(--text2);margin-left:auto}
 
-  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.tab{flex:1;padding:10px;text-align:center;font-size:12px;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:var(--green);border-bottom-color:var(--green)}
 
-  /* LOGIN */
-  #login-screen {
-    display: flex; align-items: center; justify-content: center;
-    height: 100vh; background: var(--bg);
-  }
-  .login-box {
-    width: 380px; padding: 48px 40px;
-    background: var(--bg2); border: 1px solid var(--border);
-    border-radius: 20px;
-  }
-  .login-logo { font-size: 13px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-  .login-title { font-size: 26px; font-weight: 600; margin-bottom: 32px; }
-  .login-box input {
-    width: 100%; padding: 12px 16px; margin-bottom: 12px;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 8px; color: var(--text); font-family: inherit; font-size: 14px;
-    outline: none; transition: border-color .2s;
-  }
-  .login-box input:focus { border-color: var(--accent); }
-  .login-btn {
-    width: 100%; padding: 13px; margin-top: 8px;
-    background: var(--accent); color: #000; border: none;
-    border-radius: 8px; font-family: inherit; font-size: 14px; font-weight: 600;
-    cursor: pointer; transition: background .2s;
-  }
-  .login-btn:hover { background: var(--accent2); }
-  .login-error { color: #ff5252; font-size: 13px; margin-top: 8px; display: none; }
+/* PANEL */
+.panel{flex:1;overflow:hidden;position:relative}
+.view{position:absolute;inset:0;overflow-y:auto;display:none}
+.view.active{display:block}
+.view::-webkit-scrollbar{width:3px}
+.view::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 
-  /* APP */
-  #app { display: none; height: 100vh; }
-  .layout { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+/* CONV LIST */
+.conv-filters{padding:10px 12px;display:flex;gap:8px;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.conv-filters::-webkit-scrollbar{display:none}
+.filter-chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);color:var(--text2);white-space:nowrap;transition:all .2s;background:transparent}
+.filter-chip.active{background:var(--green);color:#000;border-color:var(--green)}
 
-  /* SIDEBAR */
-  .sidebar {
-    background: var(--bg2); border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; overflow: hidden;
-  }
-  .sidebar-header {
-    padding: 20px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .sidebar-logo { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
-  .agent-name { font-size: 12px; color: var(--text2); }
-  .sidebar-search {
-    padding: 12px 16px; border-bottom: 1px solid var(--border);
-  }
-  .sidebar-search input {
-    width: 100%; padding: 8px 12px;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 8px; color: var(--text); font-family: inherit; font-size: 13px; outline: none;
-  }
-  .conv-list { flex: 1; overflow-y: auto; }
-  .conv-list::-webkit-scrollbar { width: 4px; }
-  .conv-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.conv-item{padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;display:flex;gap:12px;align-items:flex-start}
+.conv-item:hover,.conv-item.active{background:var(--bg3)}
+.conv-avatar{width:40px;height:40px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.conv-body{flex:1;min-width:0}
+.conv-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+.conv-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.conv-time{font-size:11px;color:var(--text3)}
+.conv-preview{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-tags{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px}
+.mode-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:16px}
 
-  .conv-item {
-    padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--border);
-    transition: background .15s; position: relative;
-  }
-  .conv-item:hover { background: var(--bg3); }
-  .conv-item.active { background: var(--bg3); border-left: 2px solid var(--accent); }
-  .conv-item.human-mode { border-left: 2px solid var(--human); }
-  .conv-phone { font-size: 13px; font-weight: 500; font-family: 'DM Mono', monospace; margin-bottom: 4px; }
-  .conv-preview { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-  .conv-badge {
-    position: absolute; top: 14px; right: 12px;
-    font-size: 10px; font-weight: 600; padding: 2px 6px;
-    border-radius: 20px; letter-spacing: .5px;
-  }
-  .badge-bot { background: rgba(0,230,118,.15); color: var(--accent); }
-  .badge-human { background: rgba(255,107,53,.15); color: var(--human); }
-  .badge-new { background: var(--accent); color: #000; }
+/* CHAT */
+.chat-wrap{display:none;flex-direction:column;height:100%;position:absolute;inset:0;background:var(--bg);z-index:10}
+.chat-wrap.open{display:flex}
+.chat-head{padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.back-btn{width:32px;height:32px;border-radius:50%;background:var(--bg3);border:none;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.chat-head-info{flex:1;min-width:0}
+.chat-head-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-head-status{font-size:11px;color:var(--text2);margin-top:1px}
+.ctrl-btn{padding:6px 14px;border-radius:20px;border:none;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+.ctrl-btn.take{background:var(--orange);color:#fff}
+.ctrl-btn.release{background:var(--bg4);color:var(--text);border:1px solid var(--border2)}
+.info-btn{width:32px;height:32px;border-radius:50%;background:var(--bg3);border:none;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 
-  /* CHAT */
-  .chat-area {
-    display: flex; flex-direction: column; height: 100vh;
-    background: var(--bg);
-  }
-  .chat-header {
-    padding: 16px 24px; border-bottom: 1px solid var(--border);
-    background: var(--bg2); display: flex; align-items: center; justify-content: space-between;
-  }
-  .chat-header-info .phone { font-size: 15px; font-weight: 600; font-family: 'DM Mono', monospace; }
-  .chat-header-info .status { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .control-btn {
-    padding: 8px 18px; border-radius: 8px; border: none;
-    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
-  }
-  .control-btn.take { background: var(--human); color: #fff; }
-  .control-btn.release { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+.chat-msgs{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:8px}
+.chat-msgs::-webkit-scrollbar{display:none}
+.msg{display:flex;flex-direction:column;max-width:78%}
+.msg.user{align-self:flex-start}
+.msg.assistant,.msg.human{align-self:flex-end}
+.msg-bubble{padding:10px 13px;font-size:14px;line-height:1.5;border-radius:14px;word-break:break-word}
+.msg.user .msg-bubble{background:var(--bg3);border-bottom-left-radius:4px}
+.msg.assistant .msg-bubble{background:#0d2d1a;color:#d1fae5;border-bottom-right-radius:4px}
+.msg.human .msg-bubble{background:#2d1a0d;color:#fed7aa;border-bottom-right-radius:4px}
+.msg-label{font-size:10px;color:var(--text3);margin-top:3px;padding:0 3px}
+.msg.assistant .msg-label,.msg.human .msg-label{text-align:right}
 
-  .chat-messages {
-    flex: 1; overflow-y: auto; padding: 20px 24px;
-    display: flex; flex-direction: column; gap: 10px;
-  }
-  .chat-messages::-webkit-scrollbar { width: 4px; }
-  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.chat-footer{padding:10px 12px;background:var(--bg2);border-top:1px solid var(--border)}
+.bot-notice{text-align:center;font-size:12px;color:var(--text3);padding:6px}
+.input-row{display:flex;gap:8px;align-items:flex-end}
+.msg-input{flex:1;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:22px;color:var(--text);font-family:inherit;font-size:14px;outline:none;resize:none;max-height:100px;line-height:1.4;transition:border-color .2s}
+.msg-input:focus{border-color:var(--green)}
+.send-btn{width:40px;height:40px;border-radius:50%;background:var(--green);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:background .2s}
+.send-btn:hover{background:var(--green2)}
+.send-btn:disabled{background:var(--border2);cursor:not-allowed}
 
-  .msg { display: flex; flex-direction: column; max-width: 70%; }
-  .msg.user { align-self: flex-start; }
-  .msg.assistant { align-self: flex-end; }
-  .msg-bubble {
-    padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5;
-  }
-  .msg.user .msg-bubble { background: var(--bg3); border-bottom-left-radius: 4px; }
-  .msg.assistant .msg-bubble { background: #1a3a2a; border-bottom-right-radius: 4px; color: #e0ffe0; }
-  .msg.human .msg-bubble { background: #3a1a0a; border-bottom-right-radius: 4px; color: #ffe0d0; }
-  .msg-meta { font-size: 11px; color: var(--text2); margin-top: 3px; padding: 0 2px; }
-  .msg.assistant .msg-meta, .msg.human .msg-meta { text-align: right; }
+/* CONTACT INFO SHEET */
+.info-sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:20px 16px 32px;transform:translateY(100%);transition:transform .3s;z-index:100;max-height:85vh;overflow-y:auto}
+.info-sheet.open{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 20px}
+.sheet-title{font-size:16px;font-weight:700;margin-bottom:16px}
+.field-group{margin-bottom:14px}
+.field-label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.field-input{width:100%;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text);font-family:inherit;font-size:14px;outline:none}
+.field-input:focus{border-color:var(--green)}
+textarea.field-input{resize:none;height:80px;line-height:1.5}
+.labels-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.label-toggle{padding:6px 14px;border-radius:20px;border:2px solid transparent;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;opacity:.5}
+.label-toggle.on{opacity:1}
+.save-btn{width:100%;padding:13px;background:var(--green);color:#000;border:none;border-radius:var(--rs);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px}
 
-  .chat-input-area {
-    padding: 16px 24px; border-top: 1px solid var(--border);
-    background: var(--bg2);
-  }
-  .chat-input-disabled {
-    text-align: center; color: var(--text2); font-size: 13px; padding: 8px;
-    display: none;
-  }
-  .chat-input-row { display: flex; gap: 10px; }
-  .chat-input {
-    flex: 1; padding: 12px 16px;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 10px; color: var(--text); font-family: inherit; font-size: 14px;
-    outline: none; resize: none; transition: border-color .2s; height: 44px;
-  }
-  .chat-input:focus { border-color: var(--accent); }
-  .send-btn {
-    padding: 0 20px; background: var(--accent); color: #000;
-    border: none; border-radius: 10px; font-family: inherit;
-    font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s;
-  }
-  .send-btn:hover { background: var(--accent2); }
-  .send-btn:disabled { background: var(--border); color: var(--text2); cursor: not-allowed; }
+/* CONTACTS VIEW */
+.section-title{padding:16px 16px 8px;font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px}
+.contact-item{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;cursor:pointer}
+.contact-item:hover{background:var(--bg3)}
+.contact-avatar{width:40px;height:40px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:18px}
+.contact-name{font-size:14px;font-weight:600}
+.contact-phone{font-size:12px;color:var(--text2);font-family:monospace;margin-top:2px}
 
-  .empty-state {
-    flex: 1; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; color: var(--text2);
-  }
-  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .3; }
-  .empty-text { font-size: 15px; }
+/* NOTIFICATION */
+.notif{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--green);border-radius:12px;padding:12px 16px;z-index:200;min-width:260px;max-width:90vw;animation:notifIn .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.notif-t{font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px}
+.notif-b{font-size:13px}
+@keyframes notifIn{from{opacity:0;top:0}to{opacity:1;top:16px}}
 
-  .notification {
-    position: fixed; top: 20px; right: 20px; z-index: 1000;
-    background: var(--bg2); border: 1px solid var(--accent);
-    border-radius: 10px; padding: 14px 18px; max-width: 300px;
-    animation: slideIn .3s ease; box-shadow: 0 8px 32px rgba(0,0,0,.4);
-  }
-  .notif-title { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
-  .notif-body { font-size: 13px; }
-  @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;color:var(--text3);gap:12px}
+.empty-icon{font-size:40px;opacity:.3}
 </style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<div id="login-screen">
-  <div class="login-box">
-    <div class="login-logo">Urban Pádel Life</div>
-    <div class="login-title">Panel de mensajes</div>
-    <input type="email" id="login-email" placeholder="Correo electrónico" />
-    <input type="password" id="login-pass" placeholder="Contraseña" />
-    <button class="login-btn" onclick="doLogin()">Entrar</button>
-    <div class="login-error" id="login-error">Correo o contraseña incorrectos</div>
+<div id="login">
+  <div class="login-card">
+    <div class="lc-brand">
+      <div class="lc-dot">🎾</div>
+      <div>
+        <div class="lc-name">Urban Pádel Life</div>
+        <div class="lc-sub">Las Rosas · Guadalajara</div>
+      </div>
+    </div>
+    <div class="lc-title">Bienvenido</div>
+    <input class="lc-field" id="lemail" type="email" placeholder="Correo electrónico" />
+    <input class="lc-field" id="lpass" type="password" placeholder="Contraseña"
+      onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="lc-btn" onclick="doLogin()">Entrar</button>
+    <div class="lc-err" id="lerr">Credenciales incorrectas</div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app">
-  <div class="layout">
-    <!-- SIDEBAR -->
-    <div class="sidebar">
-      <div class="sidebar-header">
-        <div>
-          <div class="sidebar-logo">Urban Pádel</div>
-          <div class="agent-name" id="agent-name"></div>
+  <div class="topbar">
+    <div class="topbar-dot"></div>
+    <div class="topbar-logo">Urban Pádel</div>
+    <div class="topbar-agent" id="agent-label"></div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('chats',this)">💬 Chats</div>
+    <div class="tab" onclick="switchTab('contacts',this)">👥 Contactos</div>
+  </div>
+  <div class="panel">
+
+    <!-- CHATS VIEW -->
+    <div class="view active" id="view-chats">
+      <div class="conv-filters" id="label-filters">
+        <div class="filter-chip active" data-label="" onclick="setFilter('',this)">Todos</div>
+      </div>
+      <div id="conv-list"></div>
+
+      <!-- CHAT OVERLAY -->
+      <div class="chat-wrap" id="chat-wrap">
+        <div class="chat-head">
+          <button class="back-btn" onclick="closeChat()">‹</button>
+          <div class="chat-head-info">
+            <div class="chat-head-name" id="ch-name">—</div>
+            <div class="chat-head-status" id="ch-status"></div>
+          </div>
+          <button class="ctrl-btn take" id="ctrl-btn" onclick="toggleControl()"></button>
+          <button class="info-btn" onclick="openInfoSheet()">⋯</button>
+        </div>
+        <div class="chat-msgs" id="chat-msgs"></div>
+        <div class="chat-footer">
+          <div class="bot-notice" id="bot-notice">El bot está activo. Toma el control para escribir.</div>
+          <div class="input-row" id="input-row" style="display:none">
+            <textarea class="msg-input" id="msg-input" placeholder="Escribe un mensaje..." rows="1"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+              oninput="autoResize(this)"></textarea>
+            <button class="send-btn" onclick="sendMsg()">➤</button>
+          </div>
         </div>
       </div>
-      <div class="sidebar-search">
-        <input type="text" placeholder="Buscar número..." oninput="filterConvs(this.value)" />
-      </div>
-      <div class="conv-list" id="conv-list"></div>
     </div>
 
-    <!-- CHAT -->
-    <div class="chat-area" id="chat-area">
-      <div class="empty-state">
-        <div class="empty-icon">💬</div>
-        <div class="empty-text">Selecciona una conversación</div>
-      </div>
+    <!-- CONTACTS VIEW -->
+    <div class="view" id="view-contacts">
+      <div class="section-title">Todos los contactos</div>
+      <div id="contacts-list"></div>
     </div>
+
   </div>
 </div>
+
+<!-- INFO SHEET -->
+<div class="info-sheet" id="info-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Información del contacto</div>
+  <div class="field-group">
+    <div class="field-label">Nombre</div>
+    <input class="field-input" id="si-name" type="text" placeholder="Nombre del contacto" />
+  </div>
+  <div class="field-group">
+    <div class="field-label">Notas</div>
+    <textarea class="field-input" id="si-notes" placeholder="Notas internas..."></textarea>
+  </div>
+  <div class="field-group">
+    <div class="field-label">Etiquetas</div>
+    <div class="labels-grid" id="si-labels"></div>
+  </div>
+  <button class="save-btn" onclick="saveContact()">Guardar</button>
+</div>
+<div id="sheet-bg" onclick="closeInfoSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99"></div>
 
 <script>
 let token = localStorage.getItem('up_token')
 let agentName = localStorage.getItem('up_name')
-let currentPhone = null
-let conversations = {}
 let socket = null
-let searchTerm = ''
+let currentPhone = null
+let currentHuman = false
+let allLabels = []
+let activeFilter = ''
+let selectedLabelIds = []
 
-// Iniciar si ya hay sesión
 if (token) showApp()
 
 async function doLogin() {
-  const email = document.getElementById('login-email').value
-  const pass = document.getElementById('login-pass').value
-  const res = await fetch('/dashboard/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: pass })
+  const email = document.getElementById('lemail').value
+  const pass = document.getElementById('lpass').value
+  const r = await fetch('/dashboard/login', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({email, password: pass})
   })
-  const data = await res.json()
-  if (data.ok) {
-    token = data.token
-    agentName = data.name
+  const d = await r.json()
+  if (d.ok) {
+    token = d.token; agentName = d.name
     localStorage.setItem('up_token', token)
     localStorage.setItem('up_name', agentName)
     showApp()
   } else {
-    document.getElementById('login-error').style.display = 'block'
+    document.getElementById('lerr').style.display = 'block'
   }
 }
 
 function showApp() {
-  document.getElementById('login-screen').style.display = 'none'
-  document.getElementById('app').style.display = 'block'
-  document.getElementById('agent-name').textContent = agentName
+  document.getElementById('login').style.display = 'none'
+  document.getElementById('app').style.display = 'flex'
+  document.getElementById('agent-label').textContent = agentName
   connectSocket()
-  loadConversations()
-  setInterval(loadConversations, 5000) // refresh cada 5s
+  loadLabels()
+  loadConvs()
+  setInterval(loadConvs, 8000)
 }
 
 function connectSocket() {
-  socket = io({ auth: { token } })
-  socket.on('new_message', (data) => {
-    if (!conversations[data.phone]) conversations[data.phone] = []
-    conversations[data.phone].push({ role: data.role, content: data.content })
-    if (currentPhone === data.phone) renderMessages(data.phone)
-    if (data.role === 'user') {
-      showNotification(`Nuevo mensaje de ${data.phone}`, data.content)
-      loadConversations()
-    }
+  socket = io({auth: {token}})
+  socket.on('new_message', d => {
+    if (currentPhone === d.phone) appendMsg(d.role, d.content, d.agent)
+    if (d.role === 'user') { showNotif(`Mensaje de ${fmt(d.phone)}`, d.content); loadConvs() }
   })
-  socket.on('control_changed', (data) => {
-    loadConversations()
-    if (currentPhone === data.phone) renderChat(data.phone)
+  socket.on('control_changed', d => {
+    if (currentPhone === d.phone) setControlUI(d.humanControl)
+    loadConvs()
   })
 }
 
-async function loadConversations() {
-  const res = await fetch('/dashboard/api/conversations', { headers: { 'x-token': token } })
-  const list = await res.json()
-  renderConvList(list)
+async function loadLabels() {
+  allLabels = await api('/dashboard/api/labels')
+  const fc = document.getElementById('label-filters')
+  allLabels.forEach(l => {
+    const el = document.createElement('div')
+    el.className = 'filter-chip'
+    el.dataset.label = l.name
+    el.textContent = l.name
+    el.style.borderColor = l.color
+    el.onclick = () => setFilter(l.name, el)
+    fc.appendChild(el)
+  })
 }
 
-function renderConvList(list) {
-  const filtered = list.filter(c => !searchTerm || c.phone.includes(searchTerm))
+function setFilter(label, el) {
+  activeFilter = label
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'))
+  el.classList.add('active')
+  loadConvs()
+}
+
+async function loadConvs() {
+  const url = activeFilter ? `/dashboard/api/conversations?label=${encodeURIComponent(activeFilter)}` : '/dashboard/api/conversations'
+  const convs = await api(url)
   const el = document.getElementById('conv-list')
-  el.innerHTML = filtered.map(c => `
-    <div class="conv-item ${currentPhone === c.phone ? 'active' : ''} ${c.humanControl ? 'human-mode' : ''}"
-         onclick="openConv('${c.phone}')">
-      <div class="conv-phone">${formatPhone(c.phone)}</div>
-      <div class="conv-preview">${escHtml(c.lastMessage)}</div>
-      <span class="conv-badge ${c.humanControl ? 'badge-human' : 'badge-bot'}">
-        ${c.humanControl ? 'Humano' : 'Bot'}
-      </span>
-    </div>
-  `).join('')
+  if (!convs.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">💬</div><div>Sin conversaciones</div></div>'; return }
+  el.innerHTML = convs.map(c => {
+    const tags = (c.labels||[]).map(l => `<span class="tag" style="background:${l.color}22;color:${l.color}">${l.name}</span>`).join('')
+    const dotColor = c.humanControl ? 'var(--orange)' : 'var(--green)'
+    return `<div class="conv-item ${currentPhone===c.phone?'active':''}" onclick="openConv('${c.phone}')">
+      <div class="conv-avatar">👤</div>
+      <div class="conv-body">
+        <div class="conv-top">
+          <div class="conv-name">${esc(c.contact_name || fmt(c.phone))}</div>
+          <div class="conv-time">${timeAgo(c.created_at)}</div>
+        </div>
+        <div class="conv-preview">${esc(c.last_message||'')}</div>
+        ${tags ? `<div class="conv-tags">${tags}</div>` : ''}
+      </div>
+      <div class="mode-dot" style="background:${dotColor}"></div>
+    </div>`
+  }).join('')
 }
 
 async function openConv(phone) {
   currentPhone = phone
-  const res = await fetch(`/dashboard/api/conversations/${phone}`, { headers: { 'x-token': token } })
-  const data = await res.json()
-  conversations[phone] = data.messages
-  renderChat(phone, data.humanControl)
-  loadConversations()
+  const data = await api(`/dashboard/api/conversations/${phone}`)
+  currentHuman = data.humanControl
+  document.getElementById('chat-wrap').classList.add('open')
+  document.getElementById('ch-name').textContent = data.contact?.name || fmt(phone)
+  setControlUI(currentHuman)
+  const msgs = document.getElementById('chat-msgs')
+  msgs.innerHTML = (data.messages||[]).map(m => msgHTML(m.role, m.content, m.agent)).join('')
+  msgs.scrollTop = msgs.scrollHeight
+  loadConvs()
 }
 
-function renderChat(phone, humanControl) {
-  const isHuman = humanControl !== undefined ? humanControl : false
-  const msgs = conversations[phone] || []
-  document.getElementById('chat-area').innerHTML = `
-    <div class="chat-header">
-      <div class="chat-header-info">
-        <div class="phone">${formatPhone(phone)}</div>
-        <div class="status">${isHuman ? '🟠 Atendido por humano' : '🟢 Bot activo'}</div>
-      </div>
-      <button class="control-btn ${isHuman ? 'release' : 'take'}"
-              onclick="toggleControl('${phone}', ${!isHuman})">
-        ${isHuman ? 'Devolver al bot' : 'Tomar control'}
-      </button>
-    </div>
-    <div class="chat-messages" id="msgs-${phone}">
-      ${msgs.map(m => renderMsg(m)).join('')}
-    </div>
-    <div class="chat-input-area">
-      <div class="chat-input-disabled" id="input-disabled" style="${!isHuman ? 'display:block' : ''}">
-        El bot está respondiendo. Toma el control para escribir.
-      </div>
-      <div class="chat-input-row" id="input-row" style="${!isHuman ? 'display:none' : ''}">
-        <textarea class="chat-input" id="msg-input" placeholder="Escribe un mensaje..."
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg('${phone}')}"></textarea>
-        <button class="send-btn" onclick="sendMsg('${phone}')">Enviar</button>
-      </div>
-    </div>
-  `
-  scrollToBottom(phone)
+function closeChat() {
+  document.getElementById('chat-wrap').classList.remove('open')
+  currentPhone = null
 }
 
-function renderMsg(m) {
-  const isHumanMsg = m.content?.startsWith('[')
-  const cls = m.role === 'user' ? 'user' : isHumanMsg ? 'human' : 'assistant'
-  const label = m.role === 'user' ? 'Cliente' : isHumanMsg ? 'Agente' : 'Bot'
-  return `
-    <div class="msg ${cls}">
-      <div class="msg-bubble">${escHtml(m.content || '')}</div>
-      <div class="msg-meta">${label}</div>
-    </div>
-  `
+function setControlUI(isHuman) {
+  currentHuman = isHuman
+  document.getElementById('ch-status').textContent = isHuman ? '🟠 Atendido por agente' : '🟢 Bot activo'
+  const btn = document.getElementById('ctrl-btn')
+  btn.textContent = isHuman ? 'Devolver al bot' : 'Tomar control'
+  btn.className = `ctrl-btn ${isHuman ? 'release' : 'take'}`
+  document.getElementById('bot-notice').style.display = isHuman ? 'none' : 'block'
+  document.getElementById('input-row').style.display = isHuman ? 'flex' : 'none'
 }
 
-function renderMessages(phone) {
-  const container = document.getElementById(`msgs-${phone}`)
-  if (!container) return
-  container.innerHTML = (conversations[phone] || []).map(m => renderMsg(m)).join('')
-  scrollToBottom(phone)
+async function toggleControl() {
+  await api(`/dashboard/api/conversations/${currentPhone}/control`, 'POST', {take: !currentHuman})
 }
 
-function scrollToBottom(phone) {
-  setTimeout(() => {
-    const el = document.getElementById(`msgs-${phone}`)
-    if (el) el.scrollTop = el.scrollHeight
-  }, 50)
-}
-
-async function toggleControl(phone, take) {
-  await fetch(`/dashboard/api/conversations/${phone}/control`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-token': token },
-    body: JSON.stringify({ take })
-  })
-  await openConv(phone)
-}
-
-async function sendMsg(phone) {
+async function sendMsg() {
   const input = document.getElementById('msg-input')
   const message = input.value.trim()
-  if (!message) return
-  input.value = ''
-  await fetch(`/dashboard/api/conversations/${phone}/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-token': token },
-    body: JSON.stringify({ message })
-  })
-  await openConv(phone)
+  if (!message || !currentPhone) return
+  input.value = ''; input.style.height = ''
+  await api(`/dashboard/api/conversations/${currentPhone}/send`, 'POST', {message})
 }
 
-function filterConvs(val) {
-  searchTerm = val
-  loadConversations()
+function appendMsg(role, content, agent) {
+  const el = document.getElementById('chat-msgs')
+  if (!el) return
+  el.insertAdjacentHTML('beforeend', msgHTML(role, content, agent))
+  el.scrollTop = el.scrollHeight
 }
 
-function formatPhone(phone) {
-  if (phone.startsWith('52') && phone.length === 12) {
+function msgHTML(role, content, agent) {
+  const isHuman = agent || (content||'').startsWith('[')
+  const cls = role === 'user' ? 'user' : isHuman ? 'human' : 'assistant'
+  const label = role === 'user' ? 'Cliente' : isHuman ? (agent || 'Agente') : 'Bot'
+  return `<div class="msg ${cls}"><div class="msg-bubble">${esc(content||'')}</div><div class="msg-label">${label}</div></div>`
+}
+
+async function openInfoSheet() {
+  if (!currentPhone) return
+  const data = await api(`/dashboard/api/conversations/${currentPhone}`)
+  const contact = data.contact || {}
+  document.getElementById('si-name').value = contact.name || ''
+  document.getElementById('si-notes').value = contact.notes || ''
+  selectedLabelIds = (contact.labels||[]).map(l => l.id)
+  const grid = document.getElementById('si-labels')
+  grid.innerHTML = allLabels.map(l => {
+    const on = selectedLabelIds.includes(l.id)
+    return `<div class="label-toggle ${on?'on':''}" data-id="${l.id}"
+      style="background:${on?l.color+'33':'transparent'};border-color:${l.color};color:${l.color}"
+      onclick="toggleLabel(this,${l.id},'${l.color}')">${l.name}</div>`
+  }).join('')
+  document.getElementById('info-sheet').classList.add('open')
+  document.getElementById('sheet-bg').style.display = 'block'
+}
+
+function toggleLabel(el, id, color) {
+  const on = !el.classList.contains('on')
+  el.classList.toggle('on', on)
+  el.style.background = on ? color+'33' : 'transparent'
+  el.style.opacity = on ? '1' : '.5'
+  if (on) selectedLabelIds.push(id)
+  else selectedLabelIds = selectedLabelIds.filter(i => i !== id)
+}
+
+async function saveContact() {
+  const name = document.getElementById('si-name').value.trim()
+  const notes = document.getElementById('si-notes').value.trim()
+  await api(`/dashboard/api/contacts/${currentPhone}`, 'PUT', {name, notes})
+  await api(`/dashboard/api/contacts/${currentPhone}/labels`, 'POST', {labelIds: selectedLabelIds})
+  document.getElementById('ch-name').textContent = name || fmt(currentPhone)
+  closeInfoSheet()
+  loadConvs()
+  showNotif('Guardado', 'Contacto actualizado correctamente')
+}
+
+function closeInfoSheet() {
+  document.getElementById('info-sheet').classList.remove('open')
+  document.getElementById('sheet-bg').style.display = 'none'
+}
+
+async function loadContacts() {
+  const contacts = await api('/dashboard/api/contacts')
+  const el = document.getElementById('contacts-list')
+  if (!contacts.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">👥</div><div>Sin contactos guardados</div></div>'; return }
+  el.innerHTML = contacts.map(c => {
+    const tags = (c.labels||[]).map(l => `<span class="tag" style="background:${l.color}22;color:${l.color}">${l.name}</span>`).join('')
+    return `<div class="contact-item" onclick="openConv('${c.phone}');switchTabByName('chats')">
+      <div class="contact-avatar">👤</div>
+      <div>
+        <div class="contact-name">${esc(c.name||'Sin nombre')}</div>
+        <div class="contact-phone">${fmt(c.phone)}</div>
+        ${tags ? `<div class="conv-tags" style="margin-top:4px">${tags}</div>` : ''}
+      </div>
+    </div>`
+  }).join('')
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
+  el.classList.add('active')
+  document.getElementById(`view-${name}`).classList.add('active')
+  if (name === 'contacts') loadContacts()
+}
+
+function switchTabByName(name) {
+  const tabs = document.querySelectorAll('.tab')
+  const views = document.querySelectorAll('.view')
+  const idx = name === 'chats' ? 0 : 1
+  tabs.forEach(t => t.classList.remove('active'))
+  views.forEach(v => v.classList.remove('active'))
+  tabs[idx].classList.add('active')
+  document.getElementById(`view-${name}`).classList.add('active')
+}
+
+function autoResize(el) {
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px'
+}
+
+async function api(url, method='GET', body=null) {
+  const opts = {headers:{'x-token':token}}
+  if (body) { opts.method = method; opts.headers['Content-Type']='application/json'; opts.body = JSON.stringify(body) }
+  else opts.method = method
+  const r = await fetch(url, opts)
+  if (!r.ok) return null
+  return r.json()
+}
+
+function fmt(phone) {
+  if (!phone) return ''
+  if (phone.startsWith('52') && phone.length === 12)
     return `+52 ${phone.slice(2,4)} ${phone.slice(4,8)} ${phone.slice(8)}`
-  }
   return `+${phone}`
 }
 
-function escHtml(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+function timeAgo(ts) {
+  if (!ts) return ''
+  const d = Math.floor((Date.now() - new Date(ts)) / 60000)
+  if (d < 1) return 'ahora'
+  if (d < 60) return `${d}m`
+  if (d < 1440) return `${Math.floor(d/60)}h`
+  return `${Math.floor(d/1440)}d`
 }
 
-function showNotification(title, body) {
+function showNotif(title, body) {
   const el = document.createElement('div')
-  el.className = 'notification'
-  el.innerHTML = `<div class="notif-title">${escHtml(title)}</div><div class="notif-body">${escHtml(body.slice(0,80))}</div>`
+  el.className = 'notif'
+  el.innerHTML = `<div class="notif-t">${esc(title)}</div><div class="notif-b">${esc((body||'').slice(0,80))}</div>`
   document.body.appendChild(el)
   setTimeout(() => el.remove(), 4000)
-  // Notificación del navegador
-  if (Notification.permission === 'granted') {
-    new Notification(title, { body: body.slice(0, 100), icon: '/dashboard/static/icon.png' })
-  } else if (Notification.permission !== 'denied') {
-    Notification.requestPermission()
-  }
+  if (Notification.permission === 'granted') new Notification(title, {body: (body||'').slice(0,100)})
+  else if (Notification.permission !== 'denied') Notification.requestPermission()
 }
 </script>
 </body>
