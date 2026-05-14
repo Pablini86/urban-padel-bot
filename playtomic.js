@@ -1,4 +1,3 @@
-// fix timezone v2
 const CLIENT_ID = process.env.PLAYTOMIC_CLIENT_ID
 const CLIENT_SECRET = process.env.PLAYTOMIC_CLIENT_SECRET
 const TENANT_ID = process.env.PLAYTOMIC_TENANT_ID
@@ -138,15 +137,32 @@ export async function getAvailability(daysAhead = 1) {
       const availableSlots = allSlots.filter(slot => {
         return courts.some(courtName => {
           const cId = courtIds[courtName]
-          if (!cId) return true // cancha sin reservas = disponible
+          if (!cId) return true
           return !courtOccupied[cId]?.has(slot)
         })
       })
 
+      // Para cada slot disponible, qué canchas están libres
+      const slotCourts = {}
+      for (const slot of availableSlots) {
+        const free = courts.filter(courtName => {
+          const cId = courtIds[courtName]
+          if (!cId) return true
+          return !courtOccupied[cId]?.has(slot)
+        })
+        slotCourts[slot] = free
+      }
+
       console.log(`[Playtomic] ${dateStr} disponibles:`, availableSlots)
 
-      const result = availableSlots.length > 0
-        ? availableSlots.join(', ')
+      // Formato: "HH:MM (Cancha X, Cancha Y)"
+      const slotLines = availableSlots.map(slot => {
+        const free = slotCourts[slot]
+        return `${slot} (${free.join(', ')})`
+      })
+
+      const result = slotLines.length > 0
+        ? slotLines.join(' | ')
         : 'SIN DISPONIBILIDAD'
 
       cache[cacheKey] = { result, ts: now }
