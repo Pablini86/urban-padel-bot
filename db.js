@@ -130,17 +130,26 @@ export async function getMessages(phone, limit = 100) {
 
 export async function getRecentConversations() {
   const r = await pool.query(`
-    SELECT DISTINCT ON (m.phone)
-      m.phone, m.content as last_message, m.role as last_role, m.created_at,
+    SELECT 
+      m.phone,
+      m.content as last_message,
+      m.role as last_role,
+      m.created_at,
       c.name as contact_name,
-      array_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color))
-        FILTER (WHERE l.id IS NOT NULL) as labels
+      COALESCE(
+        json_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color))
+        FILTER (WHERE l.id IS NOT NULL), '[]'
+      ) as labels
     FROM messages m
+    INNER JOIN (
+      SELECT phone, MAX(created_at) as max_ts
+      FROM messages GROUP BY phone
+    ) latest ON m.phone = latest.phone AND m.created_at = latest.max_ts
     LEFT JOIN contacts c ON c.phone = m.phone
     LEFT JOIN contact_labels cl ON cl.phone = m.phone
     LEFT JOIN labels l ON l.id = cl.label_id
     GROUP BY m.phone, m.content, m.role, m.created_at, c.name
-    ORDER BY m.phone, m.created_at DESC
+    ORDER BY m.created_at DESC
   `)
-  return r.rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  return r.rows
 }
