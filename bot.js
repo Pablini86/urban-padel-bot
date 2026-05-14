@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getAvailability } from './playtomic.js'
 import { sendWhatsApp } from './whatsapp.js'
+import { saveMessage, upsertContact } from './db.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 export const conversations = new Map()
@@ -69,6 +70,12 @@ export async function handleIncoming(from, name, userMessage) {
   if (!conversations.has(from)) conversations.set(from, [])
   const history = conversations.get(from)
 
+  // Guardar contacto y mensaje en DB
+  try {
+    await upsertContact(from, name)
+    await saveMessage(from, 'user', userMessage)
+  } catch (e) { console.error('[DB] Error guardando mensaje:', e.message) }
+
   history.push({ role: 'user', content: userMessage })
   if (history.length > 12) history.splice(0, history.length - 12)
 
@@ -116,6 +123,9 @@ INSTRUCCIÓN CRÍTICA SOBRE DISPONIBILIDAD:
   history.push({ role: 'assistant', content: reply })
 
   await sendWhatsApp(from, reply)
+
+  // Guardar respuesta del bot en DB
+  try { await saveMessage(from, 'assistant', reply) } catch (e) {}
 
   // Notificar al dashboard la respuesta del bot
   try {
