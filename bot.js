@@ -81,7 +81,11 @@ export async function handleIncoming(from, name, userMessage) {
         contextExtra = `\n\nDISPONIBILIDAD REAL DE PLAYTOMIC (consultada ahora mismo):
 ${availability}
 
-INSTRUCCIÓN CRÍTICA: SOLO puedes mencionar horarios que aparezcan exactamente en la lista anterior. Si el cliente pregunta por un horario que NO está en esa lista, dile que no está disponible y ofrece los que sí hay.`
+INSTRUCCIÓN CRÍTICA SOBRE DISPONIBILIDAD: 
+- Los horarios listados son los que Playtomic reporta como posiblemente disponibles, pero la disponibilidad final se confirma al entrar a Playtomic.
+- SOLO menciona horarios entre 07:00 y 23:30 que aparezcan en la lista.
+- Nunca menciones horarios de madrugada (00:00 a 06:00).
+- Cuando el cliente elija un horario, dile: "Te mando el link para que lo confirmes en Playtomic, ahí ves la disponibilidad exacta" — nunca garantices que está disponible.`
       }
     } catch (err) {
       console.error('Error Playtomic:', err)
