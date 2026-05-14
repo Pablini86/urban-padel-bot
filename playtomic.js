@@ -1,13 +1,23 @@
 const TENANT_ID = process.env.PLAYTOMIC_TENANT_ID
 
+// Zona horaria de Guadalajara (UTC-6)
+function getMexicoDate(daysAhead = 0) {
+  const now = new Date()
+  const mexicoOffset = -6 * 60
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000
+  const mexicoMs = utcMs + mexicoOffset * 60000
+  const mexicoDate = new Date(mexicoMs)
+  mexicoDate.setDate(mexicoDate.getDate() + daysAhead)
+  return mexicoDate
+}
+
 export async function getAvailability(daysAhead = 1) {
   if (!TENANT_ID) return null
 
   const results = []
 
   for (let i = 0; i <= daysAhead; i++) {
-    const date = new Date()
-    date.setDate(date.getDate() + i)
+    const date = getMexicoDate(i)
     const dateStr = date.toISOString().slice(0, 10)
 
     const params = new URLSearchParams({
@@ -28,37 +38,35 @@ export async function getAvailability(daysAhead = 1) {
       if (!res.ok) continue
 
       const data = await res.json()
-      // data es array de recursos, cada uno con .slots[]
       const resources = Array.isArray(data) ? data : []
-
       if (resources.length === 0) continue
 
       const dayLabel = i === 0 ? 'Hoy' : 'Mañana'
       const dayStr = date.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
       results.push(`*${dayLabel} - ${dayStr}*`)
 
-      for (const resource of resources) {
-        const slots = resource.slots || []
-        // Filtrar tarde: 14:00 en adelante
-        const afternoon = slots.filter(s => {
-          const hour = parseInt(s.start_time?.split(':')[0] || '0')
-          return hour >= 14
-        })
+      // Solo 6 canchas, ordenadas
+      const courts = resources.slice(0, 6)
 
-        // Agrupar por hora única (puede haber 60/90/120 min para misma hora)
-        const uniqueHours = [...new Set(afternoon.map(s => s.start_time?.slice(0, 5)))]
+      courts.forEach((resource, idx) => {
+        const slots = resource.slots || []
+        const uniqueHours = [...new Set(
+          slots
+            .filter(s => parseInt(s.start_time?.split(':')[0] || '0') >= 14)
+            .map(s => s.start_time?.slice(0, 5))
+        )].sort()
 
         if (uniqueHours.length > 0) {
-          const courtNum = resources.indexOf(resource) + 1
-          results.push(`  Cancha ${courtNum}: ${uniqueHours.join(', ')}`)
-          // Mostrar precio del primer slot
-          if (afternoon[0]?.price) {
-            results.push(`  Precio desde: ${afternoon[0].price}`)
-          }
+          results.push(`  Cancha ${idx + 1}: ${uniqueHours.join(', ')}`)
+        } else {
+          results.push(`  Cancha ${idx + 1}: Sin disponibilidad por la tarde`)
         }
-      }
+      })
 
-      results.push(`  👉 Reservar: https://playtomic.com/es/clubs/urban-padel-life`)
+      // Precio del primer slot disponible
+      const firstPrice = resources[0]?.slots?.[0]?.price
+      if (firstPrice) results.push(`  💰 Desde: ${firstPrice}`)
+      results.push(`  👉 https://playtomic.com/es/clubs/urban-padel-life`)
 
     } catch (err) {
       console.error(`Error Playtomic día ${i}:`, err)
@@ -67,5 +75,5 @@ export async function getAvailability(daysAhead = 1) {
 
   return results.length > 0
     ? results.join('\n')
-    : `No encontré disponibilidad por la tarde. Revisa en:\nhttps://playtomic.com/es/clubs/urban-padel-life`
+    : `No encontré disponibilidad. Reserva en:\nhttps://playtomic.com/es/clubs/urban-padel-life`
 }
