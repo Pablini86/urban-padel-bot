@@ -70,19 +70,18 @@ export async function handleIncoming(from, name, userMessage) {
   history.push({ role: 'user', content: userMessage })
   if (history.length > 12) history.splice(0, history.length - 12)
 
-  // Revisar historial completo para detectar intención de reserva/disponibilidad
   const fullContext = history.map(m => m.content).join(' ').toLowerCase()
-  const currentMsg = userMessage.toLowerCase()
-
   const wantsAvailability = /dispon|reserv|jugar|cancha|horario|slot|libre/.test(fullContext)
-  const hasTimeContext = /mañana|hoy|tarde|mañana|noche|lunes|martes|miércoles|jueves|viernes|sábado|domingo|am|pm|[0-9]+:[0-9]+/.test(fullContext)
 
   let contextExtra = ''
-  if (wantsAvailability && hasTimeContext) {
+  if (wantsAvailability) {
     try {
       const availability = await getAvailability(1)
       if (availability) {
-        contextExtra = `\n\nDISPONIBILIDAD REAL ACTUAL EN PLAYTOMIC — SOLO usa estos datos para hablar de horarios disponibles. Si un horario NO aparece aquí, NO está disponible. No inventes ni asumas disponibilidad:\n${availability}`
+        contextExtra = `\n\nDISPONIBILIDAD REAL DE PLAYTOMIC (consultada ahora mismo):
+${availability}
+
+INSTRUCCIÓN CRÍTICA: SOLO puedes mencionar horarios que aparezcan exactamente en la lista anterior. Si el cliente pregunta por un horario que NO está en esa lista, dile que no está disponible y ofrece los que sí hay.`
       }
     } catch (err) {
       console.error('Error Playtomic:', err)
