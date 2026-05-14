@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Urban Pádel — Panel de Mensajes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0f;
+    --bg2: #181818;
+    --bg3: #222;
+    --border: #2a2a2a;
+    --text: #f0f0f0;
+    --text2: #888;
+    --accent: #00e676;
+    --accent2: #00b853;
+    --human: #ff6b35;
+    --bot: #00e676;
+    --radius: 12px;
+  }
+
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+  /* LOGIN */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    height: 100vh; background: var(--bg);
+  }
+  .login-box {
+    width: 380px; padding: 48px 40px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 20px;
+  }
+  .login-logo { font-size: 13px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .login-title { font-size: 26px; font-weight: 600; margin-bottom: 32px; }
+  .login-box input {
+    width: 100%; padding: 12px 16px; margin-bottom: 12px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: inherit; font-size: 14px;
+    outline: none; transition: border-color .2s;
+  }
+  .login-box input:focus { border-color: var(--accent); }
+  .login-btn {
+    width: 100%; padding: 13px; margin-top: 8px;
+    background: var(--accent); color: #000; border: none;
+    border-radius: 8px; font-family: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: background .2s;
+  }
+  .login-btn:hover { background: var(--accent2); }
+  .login-error { color: #ff5252; font-size: 13px; margin-top: 8px; display: none; }
+
+  /* APP */
+  #app { display: none; height: 100vh; }
+  .layout { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--bg2); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .sidebar-logo { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+  .agent-name { font-size: 12px; color: var(--text2); }
+  .sidebar-search {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+  }
+  .sidebar-search input {
+    width: 100%; padding: 8px 12px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: inherit; font-size: 13px; outline: none;
+  }
+  .conv-list { flex: 1; overflow-y: auto; }
+  .conv-list::-webkit-scrollbar { width: 4px; }
+  .conv-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .conv-item {
+    padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--border);
+    transition: background .15s; position: relative;
+  }
+  .conv-item:hover { background: var(--bg3); }
+  .conv-item.active { background: var(--bg3); border-left: 2px solid var(--accent); }
+  .conv-item.human-mode { border-left: 2px solid var(--human); }
+  .conv-phone { font-size: 13px; font-weight: 500; font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+  .conv-preview { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .conv-badge {
+    position: absolute; top: 14px; right: 12px;
+    font-size: 10px; font-weight: 600; padding: 2px 6px;
+    border-radius: 20px; letter-spacing: .5px;
+  }
+  .badge-bot { background: rgba(0,230,118,.15); color: var(--accent); }
+  .badge-human { background: rgba(255,107,53,.15); color: var(--human); }
+  .badge-new { background: var(--accent); color: #000; }
+
+  /* CHAT */
+  .chat-area {
+    display: flex; flex-direction: column; height: 100vh;
+    background: var(--bg);
+  }
+  .chat-header {
+    padding: 16px 24px; border-bottom: 1px solid var(--border);
+    background: var(--bg2); display: flex; align-items: center; justify-content: space-between;
+  }
+  .chat-header-info .phone { font-size: 15px; font-weight: 600; font-family: 'DM Mono', monospace; }
+  .chat-header-info .status { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .control-btn {
+    padding: 8px 18px; border-radius: 8px; border: none;
+    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
+  }
+  .control-btn.take { background: var(--human); color: #fff; }
+  .control-btn.release { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .msg { display: flex; flex-direction: column; max-width: 70%; }
+  .msg.user { align-self: flex-start; }
+  .msg.assistant { align-self: flex-end; }
+  .msg-bubble {
+    padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5;
+  }
+  .msg.user .msg-bubble { background: var(--bg3); border-bottom-left-radius: 4px; }
+  .msg.assistant .msg-bubble { background: #1a3a2a; border-bottom-right-radius: 4px; color: #e0ffe0; }
+  .msg.human .msg-bubble { background: #3a1a0a; border-bottom-right-radius: 4px; color: #ffe0d0; }
+  .msg-meta { font-size: 11px; color: var(--text2); margin-top: 3px; padding: 0 2px; }
+  .msg.assistant .msg-meta, .msg.human .msg-meta { text-align: right; }
+
+  .chat-input-area {
+    padding: 16px 24px; border-top: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .chat-input-disabled {
+    text-align: center; color: var(--text2); font-size: 13px; padding: 8px;
+    display: none;
+  }
+  .chat-input-row { display: flex; gap: 10px; }
+  .chat-input {
+    flex: 1; padding: 12px 16px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text); font-family: inherit; font-size: 14px;
+    outline: none; resize: none; transition: border-color .2s; height: 44px;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+  .send-btn {
+    padding: 0 20px; background: var(--accent); color: #000;
+    border: none; border-radius: 10px; font-family: inherit;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s;
+  }
+  .send-btn:hover { background: var(--accent2); }
+  .send-btn:disabled { background: var(--border); color: var(--text2); cursor: not-allowed; }
+
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: var(--text2);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .3; }
+  .empty-text { font-size: 15px; }
+
+  .notification {
+    position: fixed; top: 20px; right: 20px; z-index: 1000;
+    background: var(--bg2); border: 1px solid var(--accent);
+    border-radius: 10px; padding: 14px 18px; max-width: 300px;
+    animation: slideIn .3s ease; box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  }
+  .notif-title { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+  .notif-body { font-size: 13px; }
+  @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Urban Pádel Life</div>
+    <div class="login-title">Panel de mensajes</div>
+    <input type="email" id="login-email" placeholder="Correo electrónico" />
+    <input type="password" id="login-pass" placeholder="Contraseña" />
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="login-error">Correo o contraseña incorrectos</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div>
+          <div class="sidebar-logo">Urban Pádel</div>
+          <div class="agent-name" id="agent-name"></div>
+        </div>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" placeholder="Buscar número..." oninput="filterConvs(this.value)" />
+      </div>
+      <div class="conv-list" id="conv-list"></div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="chat-area" id="chat-area">
+      <div class="empty-state">
+        <div class="empty-icon">💬</div>
+        <div class="empty-text">Selecciona una conversación</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let token = localStorage.getItem('up_token')
+let agentName = localStorage.getItem('up_name')
+let currentPhone = null
+let conversations = {}
+let socket = null
+let searchTerm = ''
+
+// Iniciar si ya hay sesión
+if (token) showApp()
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value
+  const pass = document.getElementById('login-pass').value
+  const res = await fetch('/dashboard/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: pass })
+  })
+  const data = await res.json()
+  if (data.ok) {
+    token = data.token
+    agentName = data.name
+    localStorage.setItem('up_token', token)
+    localStorage.setItem('up_name', agentName)
+    showApp()
+  } else {
+    document.getElementById('login-error').style.display = 'block'
+  }
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none'
+  document.getElementById('app').style.display = 'block'
+  document.getElementById('agent-name').textContent = agentName
+  connectSocket()
+  loadConversations()
+  setInterval(loadConversations, 5000) // refresh cada 5s
+}
+
+function connectSocket() {
+  socket = io({ auth: { token } })
+  socket.on('new_message', (data) => {
+    if (!conversations[data.phone]) conversations[data.phone] = []
+    conversations[data.phone].push({ role: data.role, content: data.content })
+    if (currentPhone === data.phone) renderMessages(data.phone)
+    if (data.role === 'user') {
+      showNotification(`Nuevo mensaje de ${data.phone}`, data.content)
+      loadConversations()
+    }
+  })
+  socket.on('control_changed', (data) => {
+    loadConversations()
+    if (currentPhone === data.phone) renderChat(data.phone)
+  })
+}
+
+async function loadConversations() {
+  const res = await fetch('/dashboard/api/conversations', { headers: { 'x-token': token } })
+  const list = await res.json()
+  renderConvList(list)
+}
+
+function renderConvList(list) {
+  const filtered = list.filter(c => !searchTerm || c.phone.includes(searchTerm))
+  const el = document.getElementById('conv-list')
+  el.innerHTML = filtered.map(c => `
+    <div class="conv-item ${currentPhone === c.phone ? 'active' : ''} ${c.humanControl ? 'human-mode' : ''}"
+         onclick="openConv('${c.phone}')">
+      <div class="conv-phone">${formatPhone(c.phone)}</div>
+      <div class="conv-preview">${escHtml(c.lastMessage)}</div>
+      <span class="conv-badge ${c.humanControl ? 'badge-human' : 'badge-bot'}">
+        ${c.humanControl ? 'Humano' : 'Bot'}
+      </span>
+    </div>
+  `).join('')
+}
+
+async function openConv(phone) {
+  currentPhone = phone
+  const res = await fetch(`/dashboard/api/conversations/${phone}`, { headers: { 'x-token': token } })
+  const data = await res.json()
+  conversations[phone] = data.messages
+  renderChat(phone, data.humanControl)
+  loadConversations()
+}
+
+function renderChat(phone, humanControl) {
+  const isHuman = humanControl !== undefined ? humanControl : false
+  const msgs = conversations[phone] || []
+  document.getElementById('chat-area').innerHTML = `
+    <div class="chat-header">
+      <div class="chat-header-info">
+        <div class="phone">${formatPhone(phone)}</div>
+        <div class="status">${isHuman ? '🟠 Atendido por humano' : '🟢 Bot activo'}</div>
+      </div>
+      <button class="control-btn ${isHuman ? 'release' : 'take'}"
+              onclick="toggleControl('${phone}', ${!isHuman})">
+        ${isHuman ? 'Devolver al bot' : 'Tomar control'}
+      </button>
+    </div>
+    <div class="chat-messages" id="msgs-${phone}">
+      ${msgs.map(m => renderMsg(m)).join('')}
+    </div>
+    <div class="chat-input-area">
+      <div class="chat-input-disabled" id="input-disabled" style="${!isHuman ? 'display:block' : ''}">
+        El bot está respondiendo. Toma el control para escribir.
+      </div>
+      <div class="chat-input-row" id="input-row" style="${!isHuman ? 'display:none' : ''}">
+        <textarea class="chat-input" id="msg-input" placeholder="Escribe un mensaje..."
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg('${phone}')}"></textarea>
+        <button class="send-btn" onclick="sendMsg('${phone}')">Enviar</button>
+      </div>
+    </div>
+  `
+  scrollToBottom(phone)
+}
+
+function renderMsg(m) {
+  const isHumanMsg = m.content?.startsWith('[')
+  const cls = m.role === 'user' ? 'user' : isHumanMsg ? 'human' : 'assistant'
+  const label = m.role === 'user' ? 'Cliente' : isHumanMsg ? 'Agente' : 'Bot'
+  return `
+    <div class="msg ${cls}">
+      <div class="msg-bubble">${escHtml(m.content || '')}</div>
+      <div class="msg-meta">${label}</div>
+    </div>
+  `
+}
+
+function renderMessages(phone) {
+  const container = document.getElementById(`msgs-${phone}`)
+  if (!container) return
+  container.innerHTML = (conversations[phone] || []).map(m => renderMsg(m)).join('')
+  scrollToBottom(phone)
+}
+
+function scrollToBottom(phone) {
+  setTimeout(() => {
+    const el = document.getElementById(`msgs-${phone}`)
+    if (el) el.scrollTop = el.scrollHeight
+  }, 50)
+}
+
+async function toggleControl(phone, take) {
+  await fetch(`/dashboard/api/conversations/${phone}/control`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-token': token },
+    body: JSON.stringify({ take })
+  })
+  await openConv(phone)
+}
+
+async function sendMsg(phone) {
+  const input = document.getElementById('msg-input')
+  const message = input.value.trim()
+  if (!message) return
+  input.value = ''
+  await fetch(`/dashboard/api/conversations/${phone}/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-token': token },
+    body: JSON.stringify({ message })
+  })
+  await openConv(phone)
+}
+
+function filterConvs(val) {
+  searchTerm = val
+  loadConversations()
+}
+
+function formatPhone(phone) {
+  if (phone.startsWith('52') && phone.length === 12) {
+    return `+52 ${phone.slice(2,4)} ${phone.slice(4,8)} ${phone.slice(8)}`
+  }
+  return `+${phone}`
+}
+
+function escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+function showNotification(title, body) {
+  const el = document.createElement('div')
+  el.className = 'notification'
+  el.innerHTML = `<div class="notif-title">${escHtml(title)}</div><div class="notif-body">${escHtml(body.slice(0,80))}</div>`
+  document.body.appendChild(el)
+  setTimeout(() => el.remove(), 4000)
+  // Notificación del navegador
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body: body.slice(0, 100), icon: '/dashboard/static/icon.png' })
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission()
+  }
+}
+</script>
+</body>
+</html>
