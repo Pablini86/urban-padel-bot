@@ -28,11 +28,11 @@ async function fetchDay(dateStr) {
   if (!res.ok) return []
   const data = await res.json()
 
-  // Recolectar todos los slots únicos, filtrar madrugada (antes de 7am)
+  // Solo slots con duración mínima de 60 min disponible (lo mínimo reservable)
   const allSlots = new Set()
   for (const resource of (Array.isArray(data) ? data : [])) {
     for (const slot of (resource.slots || [])) {
-      if (slot.start_time) {
+      if (slot.start_time && slot.duration >= 60) {
         const hour = parseInt(slot.start_time.slice(0, 2))
         if (hour >= 7) allSlots.add(slot.start_time.slice(0, 5))
       }
