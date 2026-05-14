@@ -4,6 +4,7 @@ const TENANT_ID = process.env.PLAYTOMIC_TENANT_ID
 
 let accessToken = null
 let tokenExpiry = 0
+let cache = {}
 
 async function getToken() {
   if (accessToken && Date.now() < tokenExpiry) return accessToken
@@ -11,40 +12,35 @@ async function getToken() {
   const res = await fetch('https://thirdparty.playtomic.io/api/v1/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: CLIENT_ID,
-      secret: CLIENT_SECRET
-    })
+    body: JSON.stringify({ client_id: CLIENT_ID, secret: CLIENT_SECRET })
   })
 
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Token error: ${err}`)
-  }
-
+  if (!res.ok) throw new Error(`Token error: ${res.status}`)
   const data = await res.json()
   accessToken = data.token
   tokenExpiry = Date.now() + (data.expires_in - 60) * 1000
-  console.log('[Playtomic] Token obtenido OK')
+  console.log('[Playtomic] Token OK')
   return accessToken
 }
 
 function getMexicoDate(daysAhead = 0) {
   const now = new Date()
-  const mexicoOffset = -6 * 60
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000
-  const mexicoMs = utcMs + mexicoOffset * 60000
-  const mexicoDate = new Date(mexicoMs)
-  mexicoDate.setDate(mexicoDate.getDate() + daysAhead)
-  return mexicoDate
+  const mxMs = now.getTime() + now.getTimezoneOffset() * 60000 + (-6 * 60 * 60000)
+  const mxDate = new Date(mxMs)
+  mxDate.setDate(mxDate.getDate() + daysAhead)
+  return mxDate
 }
 
-// Cache para no exceder 1 llamada por minuto
-let cache = {}
+// Convierte fecha UTC de Playtomic a hora México
+function utcToMexico(utcStr) {
+  const d = new Date(utcStr + 'Z') // forzar UTC
+  const mxMs = d.getTime() + (-6 * 60 * 60000)
+  return new Date(mxMs)
+}
 
 export async function getAvailability(daysAhead = 1) {
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    console.warn('[Playtomic] Credenciales no configuradas')
+  if (!CLIENT_ID || !CLIENT_SECRET || !TENANT_ID) {
+    console.warn('[Playtomic] Variables de entorno faltantes')
     return null
   }
 
@@ -55,13 +51,11 @@ export async function getAvailability(daysAhead = 1) {
     const dateStr = date.toISOString().slice(0, 10)
     const dayLabel = i === 0 ? 'HOY' : 'MAÑANA'
     const dayStr = date.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
-    const cacheKey = `${dateStr}`
+    const cacheKey = dateStr
     const now = Date.now()
 
-    // Usar cache si tiene menos de 60 segundos
     if (cache[cacheKey] && (now - cache[cacheKey].ts) < 60000) {
-      console.log(`[Playtomic] Usando cache para ${dateStr}`)
-      lines.push(`${dayLabel} (${dayStr}): ${cache[cacheKey].slots}`)
+      lines.push(`${dayLabel} (${dayStr}): ${cache[cacheKey].result}`)
       continue
     }
 
@@ -77,63 +71,79 @@ export async function getAvailability(daysAhead = 1) {
       })
 
       const res = await fetch(`https://thirdparty.playtomic.io/api/v1/bookings?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
 
-      console.log(`[Playtomic API oficial] ${dateStr} status:`, res.status)
-
       if (!res.ok) {
-        const err = await res.text()
-        console.error('[Playtomic] Error:', err)
+        console.error(`[Playtomic] ${dateStr} error ${res.status}:`, await res.text())
         lines.push(`${dayLabel} (${dayStr}): ERROR AL CONSULTAR`)
         continue
       }
 
       const bookings = await res.json()
-      console.log(`[Playtomic] Reservas ${dateStr}:`, JSON.stringify(bookings).slice(0, 500))
+      const bookingList = Array.isArray(bookings) ? bookings : bookings.data || []
+      console.log(`[Playtomic] ${dateStr}: ${bookingList.length} reservas`)
 
-      // Extraer horarios OCUPADOS
-      const occupied = new Set()
-      const bookingList = Array.isArray(bookings) ? bookings : bookings.content || bookings.data || []
+      // Mapear cancha -> slots ocupados
+      const courtOccupied = {} // { resource_id: Set of occupied 30-min slots }
 
-      for (const booking of bookingList) {
-        if (booking.is_canceled) continue
-        const startTime = booking.booking_start_date
-        if (startTime) {
-          // Convertir UTC a hora México (UTC-6)
-          const d = new Date(startTime)
-          const mxMs = d.getTime() + (-6 * 60 * 60000)
-          const mxDate = new Date(mxMs)
-          const h = mxDate.getUTCHours().toString().padStart(2, '0')
-          const m = mxDate.getUTCMinutes().toString().padStart(2, '0')
-          // Marcar todo el bloque como ocupado según duración
-          const durationMs = booking.duration / 1000 // microseconds to ms
-          const slots = Math.ceil(durationMs / (30 * 60 * 1000))
-          for (let s = 0; s < slots; s++) {
-            const slotMs = mxMs + s * 30 * 60 * 1000
-            const sd = new Date(slotMs)
-            const sh = sd.getUTCHours().toString().padStart(2, '0')
-            const sm = sd.getUTCMinutes().toString().padStart(2, '0')
-            occupied.add(`${sh}:${sm}`)
-          }
+      for (const b of bookingList) {
+        if (b.is_canceled) continue
+
+        const start = utcToMexico(b.booking_start_date)
+        const end = utcToMexico(b.booking_end_date)
+        const courtId = b.resource_id
+
+        if (!courtOccupied[courtId]) courtOccupied[courtId] = new Set()
+
+        // Marcar cada slot de 30 min como ocupado
+        let current = new Date(start)
+        while (current < end) {
+          const h = current.getUTCHours().toString().padStart(2, '0')
+          const m = current.getUTCMinutes().toString().padStart(2, '0')
+          courtOccupied[courtId].add(`${h}:${m}`)
+          current = new Date(current.getTime() + 30 * 60 * 1000)
         }
       }
 
-      console.log(`[Playtomic] Ocupados ${dateStr}:`, [...occupied])
+      // Canchas del club
+      const courts = ['Cancha 1','Cancha 2','Cancha 3','Cancha 4','Cancha 5','Cancha 6']
+      const courtIds = bookingList
+        .filter(b => !b.is_canceled)
+        .reduce((acc, b) => {
+          if (b.resource_name) acc[b.resource_name.trim()] = b.resource_id
+          return acc
+        }, {})
 
-      // Generar slots disponibles (7am-10:30pm cada 30 min) menos los ocupados
-      const available = []
+      // Calcular slots disponibles por cancha (7am - 10:30pm)
+      const allSlots = []
       for (let h = 7; h <= 22; h++) {
-        for (const min of ['00', '30']) {
-          if (h === 22 && min === '30') continue
-          const slot = `${h.toString().padStart(2, '0')}:${min}`
-          if (!occupied.has(slot)) available.push(slot)
+        for (const min of [0, 30]) {
+          if (h === 22 && min === 30) continue
+          allSlots.push(`${h.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}`)
         }
       }
 
-      const slotsStr = available.length > 0 ? available.join(', ') : 'SIN DISPONIBILIDAD'
-      cache[cacheKey] = { slots: slotsStr, ts: now }
-      lines.push(`${dayLabel} (${dayStr}): ${slotsStr}`)
+      // Un slot está disponible si AL MENOS UNA cancha lo tiene libre
+      const availableSlots = allSlots.filter(slot => {
+        return courts.some(courtName => {
+          const cId = courtIds[courtName]
+          if (!cId) return true // cancha sin reservas = disponible
+          return !courtOccupied[cId]?.has(slot)
+        })
+      })
+
+      console.log(`[Playtomic] ${dateStr} disponibles:`, availableSlots)
+
+      const result = availableSlots.length > 0
+        ? availableSlots.join(', ')
+        : 'SIN DISPONIBILIDAD'
+
+      cache[cacheKey] = { result, ts: now }
+      lines.push(`${dayLabel} (${dayStr}): ${result}`)
 
     } catch (err) {
       console.error(`[Playtomic] Error ${dateStr}:`, err.message)
@@ -141,7 +151,5 @@ export async function getAvailability(daysAhead = 1) {
     }
   }
 
-  const result = lines.join('\n')
-  console.log('[Playtomic] Resultado:\n', result)
-  return result
+  return lines.join('\n')
 }
