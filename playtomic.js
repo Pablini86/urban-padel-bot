@@ -31,11 +31,11 @@ function getMexicoDate(daysAhead = 0) {
   return mxDate
 }
 
-// Convierte fecha UTC de Playtomic a hora México
+// Convierte fecha UTC de Playtomic a hora México (UTC-6)
 function utcToMexico(utcStr) {
-  const d = new Date(utcStr + 'Z') // forzar UTC
-  const mxMs = d.getTime() + (-6 * 60 * 60000)
-  return new Date(mxMs)
+  // Playtomic devuelve sin Z pero son UTC
+  const d = new Date(utcStr.includes('Z') ? utcStr : utcStr + 'Z')
+  return new Date(d.getTime() - 6 * 60 * 60 * 1000)
 }
 
 export async function getAvailability(daysAhead = 1) {
@@ -62,10 +62,14 @@ export async function getAvailability(daysAhead = 1) {
     try {
       const token = await getToken()
 
+      // Consultar desde medianoche hasta las 6am del día siguiente (UTC)
+      // para capturar reservas nocturnas (ej. 19:00-23:00 México = 01:00-05:00 UTC siguiente día)
+      const nextDateStr = new Date(date.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
       const params = new URLSearchParams({
         tenant_id: TENANT_ID,
         start_booking_date: `${dateStr}T00:00:00`,
-        end_booking_date: `${dateStr}T23:59:59`,
+        end_booking_date: `${nextDateStr}T06:00:00`,
         sport_id: 'PADEL',
         size: 200
       })
@@ -102,6 +106,7 @@ export async function getAvailability(daysAhead = 1) {
         // Marcar cada slot de 30 min como ocupado
         let current = new Date(start)
         while (current < end) {
+          // Usar UTC hours porque ya restamos 6h, la fecha está desplazada
           const h = current.getUTCHours().toString().padStart(2, '0')
           const m = current.getUTCMinutes().toString().padStart(2, '0')
           courtOccupied[courtId].add(`${h}:${m}`)
