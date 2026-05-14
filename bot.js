@@ -31,7 +31,7 @@ Clases particulares (Academia Deportiva):
 - Clase para 3 jugadores: $1,000 MXN (incluye palas)
 - Clase para 4 jugadores: $1,200 MXN (incluye palas)
 
-Clínica para niños ($1,500 MXN mensuales, horario 4:00 - 5:00pm):
+Clínica para niños ($1,200 MXN mensuales, horario 4:00 - 5:00pm):
 - Lunes y miércoles: Intermedio/Avanzado (10-15 años)
 - Martes y jueves: Básico (5-9 años)
 
@@ -60,7 +60,7 @@ REGLAS DE CONVERSACIÓN:
 5. Muestra solo los HORARIOS disponibles, no el número de cancha a menos que pregunten.
 6. Si no sabes algo, manda al contacto del club: +52 33 3486 8183
 7. Respuestas cortas y naturales, máximo 4-5 líneas, sin listas ni asteriscos.
-8. No inventes información que no esté aquí.
+8. NUNCA inventes disponibilidad. Si no tienes datos reales de Playtomic en este mensaje, di que vas a consultar o manda al cliente directamente a Playtomic.
 9. La zona horaria es Guadalajara (CDT, UTC-6)`
 
 export async function handleIncoming(from, name, userMessage) {
@@ -70,15 +70,19 @@ export async function handleIncoming(from, name, userMessage) {
   history.push({ role: 'user', content: userMessage })
   if (history.length > 12) history.splice(0, history.length - 12)
 
-  const askingAvailability = /dispon|cancha|hora|reserv|jugar|cuando|slot|turno|libre|mañana|hoy|tarde|mañana|noche/i.test(userMessage)
-  const specifiedTime = /mañana|tarde|noche|am|pm|[0-9]+:[0-9]+/i.test(userMessage)
+  // Revisar historial completo para detectar intención de reserva/disponibilidad
+  const fullContext = history.map(m => m.content).join(' ').toLowerCase()
+  const currentMsg = userMessage.toLowerCase()
+
+  const wantsAvailability = /dispon|reserv|jugar|cancha|horario|slot|libre/.test(fullContext)
+  const hasTimeContext = /mañana|hoy|tarde|mañana|noche|lunes|martes|miércoles|jueves|viernes|sábado|domingo|am|pm|[0-9]+:[0-9]+/.test(fullContext)
 
   let contextExtra = ''
-  if (askingAvailability && specifiedTime) {
+  if (wantsAvailability && hasTimeContext) {
     try {
       const availability = await getAvailability(1)
       if (availability) {
-        contextExtra = `\n\nDISPONIBILIDAD ACTUAL EN PLAYTOMIC (usa esto para responder, no lo copies tal cual, redáctalo natural):\n${availability}`
+        contextExtra = `\n\nDISPONIBILIDAD REAL ACTUAL EN PLAYTOMIC — SOLO usa estos datos para hablar de horarios disponibles. Si un horario NO aparece aquí, NO está disponible. No inventes ni asumas disponibilidad:\n${availability}`
       }
     } catch (err) {
       console.error('Error Playtomic:', err)
