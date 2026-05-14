@@ -133,22 +133,27 @@ export async function getAvailability(daysAhead = 1) {
         }
       }
 
-      // Un slot está disponible si AL MENOS UNA cancha lo tiene libre
+      // Un slot está disponible si AL MENOS UNA cancha tiene 60 min consecutivos libres
       const availableSlots = allSlots.filter(slot => {
         return courts.some(courtName => {
           const cId = courtIds[courtName]
+          const [h, m] = slot.split(':').map(Number)
+          // Verificar slot actual y siguiente (60 min = 2 slots de 30 min)
+          const slot2m = m + 30 >= 60 ? `${(h+1).toString().padStart(2,'0')}:${((m+30)%60).toString().padStart(2,'0')}` : `${h.toString().padStart(2,'0')}:${(m+30).toString().padStart(2,'0')}`
           if (!cId) return true
-          return !courtOccupied[cId]?.has(slot)
+          return !courtOccupied[cId]?.has(slot) && !courtOccupied[cId]?.has(slot2m)
         })
       })
 
-      // Para cada slot disponible, qué canchas están libres
+      // Para cada slot disponible, qué canchas tienen 60 min libres
       const slotCourts = {}
       for (const slot of availableSlots) {
+        const [h, m] = slot.split(':').map(Number)
+        const slot2m = m + 30 >= 60 ? `${(h+1).toString().padStart(2,'0')}:${((m+30)%60).toString().padStart(2,'0')}` : `${h.toString().padStart(2,'0')}:${(m+30).toString().padStart(2,'0')}`
         const free = courts.filter(courtName => {
           const cId = courtIds[courtName]
           if (!cId) return true
-          return !courtOccupied[cId]?.has(slot)
+          return !courtOccupied[cId]?.has(slot) && !courtOccupied[cId]?.has(slot2m)
         })
         slotCourts[slot] = free
       }
