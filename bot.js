@@ -26,10 +26,10 @@ EQUIPAMIENTO:
 
 CLASES Y ACADEMIA:
 Clases particulares (Academia Deportiva):
-- Clase particular (1 jugador): $700 MXN
-- Clase para 2 jugadores: $800 MXN
-- Clase para 3 jugadores: $1,000 MXN
-- Clase para 4 jugadores: $1,200 MXN
+- Clase particular (1 jugador): $700 MXN (incluye pala)
+- Clase para 2 jugadores: $800 MXN (incluye palas)
+- Clase para 3 jugadores: $1,000 MXN (incluye palas)
+- Clase para 4 jugadores: $1,200 MXN (incluye palas)
 
 Clínica para niños ($1,200 MXN mensuales, horario 4:00 - 5:00pm):
 - Lunes y miércoles: Intermedio/Avanzado (10-15 años)
