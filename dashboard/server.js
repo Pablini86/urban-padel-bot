@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { sendWhatsApp } from '../whatsapp.js'
 import {
-  initDB, upsertContact, updateContact, getContact,
+  initDB, upsertContact, updateContact, getContact, markConversationOpened,
   getAllContacts, getAllLabels, setContactLabels, createLabel,
   saveMessage, getMessages, getRecentConversations
 } from '../db.js'
@@ -58,9 +58,10 @@ export async function initDashboard(app, conversations) {
 
   // Conversaciones recientes
   app.get('/dashboard/api/conversations', auth, async (req, res) => {
-    const { label } = req.query
+    const { label, status } = req.query
     let convs = await getRecentConversations()
     if (label) convs = convs.filter(c => c.labels?.some(l => l.name === label))
+    if (status) convs = convs.filter(c => c.status === status)
     const result = convs.map(c => ({
       ...c,
       humanControl: humanControl.has(c.phone)
@@ -70,6 +71,7 @@ export async function initDashboard(app, conversations) {
 
   // Mensajes de conversación
   app.get('/dashboard/api/conversations/:phone', auth, async (req, res) => {
+    await markConversationOpened(req.params.phone)
     const msgs = await getMessages(req.params.phone)
     const contact = await getContact(req.params.phone)
     res.json({

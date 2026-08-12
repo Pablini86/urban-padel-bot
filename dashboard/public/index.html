@@ -25,6 +25,8 @@
   --signal-soft:#FCEEE2;
   --danger:#D14545;
   --danger-soft:#FBEAEA;
+  --info:#2563A6;
+  --info-soft:#E7F0F9;
   --shadow-1: 0 1px 2px rgba(18,24,27,.05);
   --shadow-2: 0 10px 30px rgba(18,24,27,.12);
   --shadow-3: 0 20px 50px rgba(18,24,27,.22);
@@ -99,6 +101,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus
 .conv-filters::-webkit-scrollbar{display:none}
 .filter-chip{padding:5px 12px;border-radius:var(--r-full);font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid var(--line);color:var(--slate);white-space:nowrap;transition:all .15s;background:var(--surface)}
 .filter-chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.status-filters{padding:0 12px 10px;display:flex;gap:6px;flex-shrink:0}
+.status-chip{flex:1;padding:7px 0;text-align:center;border-radius:var(--r-sm);font-size:11.5px;font-weight:700;cursor:pointer;border:1px solid var(--line);color:var(--slate);background:var(--surface);transition:all .15s}
+.status-chip.active{background:var(--info);color:#fff;border-color:var(--info)}
+.status-chip.active[data-status="abierto"]{background:var(--court);border-color:var(--court)}
 
 .list-scroll{flex:1;overflow-y:auto;min-height:0}
 .list-scroll::-webkit-scrollbar{width:6px}
@@ -110,7 +116,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus
 .avatar{width:38px;height:38px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--slate);flex-shrink:0}
 .conv-body{flex:1;min-width:0}
 .conv-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:3px}
-.conv-name{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-name{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.new-dot{width:6px;height:6px;border-radius:50%;background:var(--info);flex-shrink:0}
 .conv-time{font-size:10.5px;color:var(--faint);flex-shrink:0;font-family:'JetBrains Mono',monospace}
 .conv-preview{font-size:12.5px;color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .conv-tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
@@ -301,6 +308,11 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
             <input class="search-input" id="search-input" placeholder="Buscar por nombre o número" oninput="loadConvs()" />
           </div>
         </div>
+        <div class="status-filters" id="status-filters">
+          <div class="status-chip active" data-status="" onclick="setStatusFilter('',this)">Todos</div>
+          <div class="status-chip" data-status="nuevo" onclick="setStatusFilter('nuevo',this)">Nuevos</div>
+          <div class="status-chip" data-status="abierto" onclick="setStatusFilter('abierto',this)">Abiertos</div>
+        </div>
         <div class="conv-filters" id="label-filters">
           <div class="filter-chip active" data-label="" onclick="setFilter('',this)">Todos</div>
         </div>
@@ -407,6 +419,7 @@ let currentPhone = null
 let currentHuman = false
 let allLabels = []
 let activeFilter = ''
+let activeStatus = ''
 let activeTab = 'chats'
 let selectedLabelIds = []
 
@@ -489,8 +502,18 @@ function setFilter(label, el) {
   loadConvs()
 }
 
+function setStatusFilter(status, el) {
+  activeStatus = status
+  document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('active'))
+  el.classList.add('active')
+  loadConvs()
+}
+
 async function loadConvs() {
-  const url = activeFilter ? `/dashboard/api/conversations?label=${encodeURIComponent(activeFilter)}` : '/dashboard/api/conversations'
+  const params = new URLSearchParams()
+  if (activeFilter) params.set('label', activeFilter)
+  if (activeStatus) params.set('status', activeStatus)
+  const url = '/dashboard/api/conversations' + (params.toString() ? '?' + params : '')
   let convs = await api(url)
   if (!convs) return
   const q = document.getElementById('search-input').value.trim().toLowerCase()
@@ -511,7 +534,7 @@ async function loadConvs() {
       <div class="avatar">${initials(c.contact_name || c.phone)}</div>
       <div class="conv-body">
         <div class="conv-top">
-          <div class="conv-name">${esc(c.contact_name || fmt(c.phone))}</div>
+          <div class="conv-name">${c.status==='nuevo' ? '<span class="new-dot"></span>' : ''}${esc(c.contact_name || fmt(c.phone))}</div>
           <div class="conv-time">${timeAgo(c.created_at)}</div>
         </div>
         <div class="conv-preview">${esc(c.last_message||'')}</div>

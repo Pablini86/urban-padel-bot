@@ -12,9 +12,11 @@ export async function initDB() {
       phone TEXT PRIMARY KEY,
       name TEXT,
       notes TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'nuevo',
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'nuevo';
 
     CREATE TABLE IF NOT EXISTS labels (
       id SERIAL PRIMARY KEY,
@@ -72,6 +74,11 @@ export async function updateContact(phone, { name, notes }) {
   await pool.query(`
     UPDATE contacts SET name = $2, notes = $3, updated_at = NOW() WHERE phone = $1
   `, [phone, name, notes])
+}
+
+// Pasa una conversación de 'nuevo' a 'abierto' la primera vez que el equipo la abre en el panel
+export async function markConversationOpened(phone) {
+  await pool.query(`UPDATE contacts SET status = 'abierto' WHERE phone = $1 AND status = 'nuevo'`, [phone])
 }
 
 export async function getContact(phone) {
@@ -157,6 +164,7 @@ export async function getRecentConversations() {
       m.role as last_role,
       m.created_at,
       c.name as contact_name,
+      COALESCE(c.status, 'nuevo') as status,
       COALESCE(
         json_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color))
         FILTER (WHERE l.id IS NOT NULL), '[]'
@@ -169,7 +177,7 @@ export async function getRecentConversations() {
     LEFT JOIN contacts c ON c.phone = m.phone
     LEFT JOIN contact_labels cl ON cl.phone = m.phone
     LEFT JOIN labels l ON l.id = cl.label_id
-    GROUP BY m.phone, m.content, m.role, m.created_at, c.name
+    GROUP BY m.phone, m.content, m.role, m.created_at, c.name, c.status
     ORDER BY m.created_at DESC
   `)
   return r.rows
