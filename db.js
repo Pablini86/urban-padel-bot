@@ -47,7 +47,8 @@ export async function initDB() {
     { name: 'Socio', color: '#f59e0b' },
     { name: 'Clases', color: '#10b981' },
     { name: 'Torneo', color: '#ef4444' },
-    { name: 'Liga', color: '#3b82f6' }
+    { name: 'Liga', color: '#3b82f6' },
+    { name: 'Necesita humano', color: '#dc2626' }
   ]
   for (const l of labels) {
     await pool.query(
@@ -110,6 +111,26 @@ export async function setContactLabels(phone, labelIds) {
   for (const id of labelIds) {
     await pool.query(`INSERT INTO contact_labels (phone, label_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [phone, id])
   }
+}
+
+export async function createLabel(name, color) {
+  const r = await pool.query(
+    `INSERT INTO labels (name, color) VALUES ($1, $2)
+     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING *`,
+    [name, color]
+  )
+  return r.rows[0]
+}
+
+// Agrega una etiqueta a un contacto sin tocar las que ya tiene (usado por el bot para auto-etiquetar)
+export async function addLabelIfMissing(phone, labelName) {
+  const label = await pool.query(`SELECT id FROM labels WHERE name = $1`, [labelName])
+  if (!label.rows[0]) return
+  await pool.query(
+    `INSERT INTO contact_labels (phone, label_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [phone, label.rows[0].id]
+  )
 }
 
 // Mensajes

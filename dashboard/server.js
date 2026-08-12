@@ -6,7 +6,7 @@ import { dirname, join } from 'path'
 import { sendWhatsApp } from '../whatsapp.js'
 import {
   initDB, upsertContact, updateContact, getContact,
-  getAllContacts, getAllLabels, setContactLabels,
+  getAllContacts, getAllLabels, setContactLabels, createLabel,
   saveMessage, getMessages, getRecentConversations
 } from '../db.js'
 
@@ -121,6 +121,13 @@ export async function initDashboard(app, conversations) {
   // Etiquetas
   app.get('/dashboard/api/labels', auth, async (req, res) => {
     res.json(await getAllLabels())
+  })
+
+  app.post('/dashboard/api/labels', auth, express.json(), async (req, res) => {
+    const { name, color } = req.body
+    if (!name?.trim() || !color) return res.status(400).json({ error: 'Falta nombre o color' })
+    const label = await createLabel(name.trim(), color)
+    res.json(label)
   })
 
   app.get('/dashboard', (req, res) => res.sendFile(join(__dirname, 'public', 'index.html')))

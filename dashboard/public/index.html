@@ -191,6 +191,14 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
 .labels-grid{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
 .label-toggle{padding:6px 13px;border-radius:var(--r-full);border:1.5px solid var(--line);font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s;color:var(--slate);background:var(--surface)}
 .label-toggle.on{border-color:transparent;color:#fff}
+.label-add{padding:6px 13px;border-radius:var(--r-full);border:1.5px dashed var(--faint);font-size:12.5px;font-weight:600;cursor:pointer;color:var(--faint);background:transparent;transition:all .15s}
+.label-add:hover{color:var(--ink);border-color:var(--ink)}
+.new-label-form{display:none;gap:8px;align-items:center;margin-top:10px}
+.new-label-form.open{display:flex}
+.new-label-form input[type=text]{flex:1;padding:8px 12px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);font-family:inherit;font-size:12.5px;color:var(--ink);outline:none}
+.new-label-form input[type=text]:focus{border-color:var(--court)}
+.new-label-form input[type=color]{width:32px;height:32px;padding:0;border:1px solid var(--line);border-radius:var(--r-sm);cursor:pointer;background:none;flex-shrink:0}
+.new-label-form button{padding:8px 14px;border-radius:var(--r-sm);border:none;background:var(--ink);color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;flex-shrink:0}
 .info-footer{padding:16px 20px;border-top:1px solid var(--line);flex-shrink:0}
 .save-btn{width:100%;padding:12px;background:var(--ink);color:#fff;border:none;border-radius:var(--r-sm);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .15s}
 .save-btn:hover{background:var(--court-deep)}
@@ -204,6 +212,8 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
 
 /* ---------- NOTIFICATION ---------- */
 .notif{position:fixed;top:18px;right:18px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--court);border-radius:var(--r-md);padding:13px 16px;z-index:200;min-width:260px;max-width:340px;box-shadow:var(--shadow-3);animation:notifIn .3s var(--ease)}
+.notif.urgent{border-left-color:var(--danger)}
+.notif.urgent .notif-t{color:var(--danger)}
 .notif-t{font-size:11.5px;font-weight:700;color:var(--court-deep);margin-bottom:3px}
 .notif-b{font-size:13px;color:var(--ink)}
 @keyframes notifIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
@@ -375,6 +385,12 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
     <div class="field-group">
       <div class="field-label">Etiquetas</div>
       <div class="labels-grid" id="si-labels"></div>
+      <div class="new-label-form" id="new-label-form">
+        <input type="text" id="new-label-name" placeholder="Nombre de la etiqueta" maxlength="24"
+          onkeydown="if(event.key==='Enter')createNewLabel()" />
+        <input type="color" id="new-label-color" value="#17824A" />
+        <button onclick="createNewLabel()">Crear</button>
+      </div>
     </div>
   </div>
   <div class="info-footer">
@@ -440,12 +456,21 @@ function connectSocket() {
     if (currentPhone === d.phone) setControlUI(d.humanControl)
     loadConvs()
   })
+  socket.on('needs_human', d => {
+    showNotif('Piden hablar con alguien', `${d.name || fmt(d.phone)} quiere hablar con una persona`, true)
+    loadConvs()
+  })
 }
 
 async function loadLabels() {
   allLabels = await api('/dashboard/api/labels')
   if (!allLabels) return
+  renderLabelFilters()
+}
+
+function renderLabelFilters() {
   const fc = document.getElementById('label-filters')
+  fc.querySelectorAll('.filter-chip:not([data-label=""])').forEach(el => el.remove())
   allLabels.forEach(l => {
     const el = document.createElement('div')
     el.className = 'filter-chip'
@@ -581,15 +606,39 @@ async function openInfoSheet() {
   document.getElementById('si-name').value = contact.name || ''
   document.getElementById('si-notes').value = contact.notes || ''
   selectedLabelIds = (contact.labels||[]).map(l => l.id)
+  renderLabelGrid()
+  document.getElementById('new-label-form').classList.remove('open')
+  document.getElementById('info-panel').classList.add('open')
+  document.getElementById('info-overlay').classList.add('open')
+}
+
+function renderLabelGrid() {
   const grid = document.getElementById('si-labels')
   grid.innerHTML = allLabels.map(l => {
     const on = selectedLabelIds.includes(l.id)
     return `<div class="label-toggle ${on?'on':''}" data-id="${l.id}"
       style="background:${on?l.color:'var(--surface)'};border-color:${l.color}"
       onclick="toggleLabel(this,${l.id},'${l.color}')">${l.name}</div>`
-  }).join('')
-  document.getElementById('info-panel').classList.add('open')
-  document.getElementById('info-overlay').classList.add('open')
+  }).join('') + `<div class="label-add" onclick="toggleNewLabelForm()">+ Nueva</div>`
+}
+
+function toggleNewLabelForm() {
+  document.getElementById('new-label-form').classList.toggle('open')
+  document.getElementById('new-label-name').focus()
+}
+
+async function createNewLabel() {
+  const name = document.getElementById('new-label-name').value.trim()
+  const color = document.getElementById('new-label-color').value
+  if (!name) return
+  const label = await api('/dashboard/api/labels', 'POST', { name, color })
+  if (!label) return
+  if (!allLabels.some(l => l.id === label.id)) allLabels.push(label)
+  selectedLabelIds.push(label.id)
+  renderLabelFilters()
+  renderLabelGrid()
+  document.getElementById('new-label-name').value = ''
+  document.getElementById('new-label-form').classList.remove('open')
 }
 
 function toggleLabel(el, id, color) {
@@ -692,12 +741,12 @@ function timeAgo(ts) {
   return `${Math.floor(d/1440)}d`
 }
 
-function showNotif(title, body) {
+function showNotif(title, body, urgent) {
   const el = document.createElement('div')
-  el.className = 'notif'
+  el.className = 'notif' + (urgent ? ' urgent' : '')
   el.innerHTML = `<div class="notif-t">${esc(title)}</div><div class="notif-b">${esc((body||'').slice(0,80))}</div>`
   document.body.appendChild(el)
-  setTimeout(() => el.remove(), 4000)
+  setTimeout(() => el.remove(), urgent ? 7000 : 4000)
   if (Notification.permission === 'granted') new Notification(title, {body: (body||'').slice(0,100)})
   else if (Notification.permission !== 'denied') Notification.requestPermission()
 }

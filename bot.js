@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getAvailability } from './playtomic.js'
 import { sendWhatsApp } from './whatsapp.js'
-import { saveMessage, upsertContact } from './db.js'
+import { saveMessage, upsertContact, addLabelIfMissing } from './db.js'
 import { dashboardIO, humanControl } from './dashboard/server.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -65,11 +65,15 @@ REGLAS DE CONVERSACIÓN:
 8. NUNCA inventes disponibilidad. Si no tienes datos reales de Playtomic en este mensaje, di que vas a consultar o manda al cliente directamente a Playtomic.
 9. La zona horaria es Guadalajara (CDT, UTC-6)
 10. Cuando alguien diga una hora sin AM/PM, usa el contexto: si ya hablaron de tarde/noche, asume PM. Nunca confundas 9pm con 9am.
-11. La disponibilidad viene en formato "HH:MM (Cancha X, Cancha Y)" — cuando pregunten qué cancha hay a cierta hora, responde con las canchas específicas de ese slot.`
+11. La disponibilidad viene en formato "HH:MM (Cancha X, Cancha Y)" — cuando pregunten qué cancha hay a cierta hora, responde con las canchas específicas de ese slot.
+12. Si preguntan directamente si eres un bot, una IA o un robot, contesta que sí con toda naturalidad. Nunca lo niegues ni evadas la pregunta.`
+
+const WANTS_HUMAN_RE = /hablar\s+con\s+(un\w*\s+)?(humano|persona|alguien|agente|asesor)|persona\s+real|atenci[oó]n\s+humana|quiero\s+un\s+humano|p[aá]same\s+con|comun[ií]\w*\s+con\s+(alguien|un\w*)/i
 
 export async function handleIncoming(from, name, userMessage) {
   if (!conversations.has(from)) conversations.set(from, [])
   const history = conversations.get(from)
+  const isFirstMessage = history.length === 0
 
   // Guardar contacto y mensaje en DB
   try {
@@ -89,15 +93,28 @@ export async function handleIncoming(from, name, userMessage) {
     return
   }
 
+  // Detectar si pide hablar con una persona y avisar al equipo (etiqueta + notificación al dashboard)
+  const wantsHuman = WANTS_HUMAN_RE.test(userMessage)
+  if (wantsHuman) {
+    try { await addLabelIfMissing(from, 'Necesita humano') } catch (e) { console.error('[DB] Error etiquetando:', e.message) }
+    if (dashboardIO) dashboardIO.emit('needs_human', { phone: from, name })
+  }
+
   const fullContext = history.map(m => m.content).join(' ').toLowerCase()
   const wantsAvailability = /dispon|reserv|jugar|cancha|horario|slot|libre/.test(fullContext)
 
   let contextExtra = ''
+  if (isFirstMessage) {
+    contextExtra += `\n\nINSTRUCCIÓN: Este es el primer mensaje de este contacto. Antes de responder su pregunta, acláralo en una frase breve y natural (no siempre la misma) que eres el asistente virtual con inteligencia artificial de Urban Pádel Life, no una persona.`
+  }
+  if (wantsHuman) {
+    contextExtra += `\n\nINSTRUCCIÓN: El cliente pidió hablar con una persona. Ya se le avisó al equipo del club y alguien lo va a contactar. Acláraselo brevemente y sigue ayudando en lo que puedas mientras tanto con la información que tienes.`
+  }
   if (wantsAvailability) {
     try {
       const availability = await getAvailability(1)
       if (availability) {
-        contextExtra = `\n\nDISPONIBILIDAD REAL DE PLAYTOMIC (consultada ahora mismo):
+        contextExtra += `\n\nDISPONIBILIDAD REAL DE PLAYTOMIC (consultada ahora mismo):
 ${availability}
 
 INSTRUCCIÓN CRÍTICA SOBRE DISPONIBILIDAD: 
