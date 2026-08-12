@@ -1,6 +1,12 @@
 import express from 'express'
 import { handleIncoming, conversations } from './bot.js'
 import { initDashboard } from './dashboard/server.js'
+import { normalizeMxPhone } from './phone.js'
+
+// El bot de WhatsApp vive en el mismo proceso que el dashboard: un error suelto
+// en cualquier lado no debe tumbar la línea de atención en vivo.
+process.on('unhandledRejection', err => console.error('[Proceso] Rejection sin atrapar:', err))
+process.on('uncaughtException', err => console.error('[Proceso] Excepción sin atrapar:', err))
 
 const app = express()
 app.use(express.json())
@@ -23,7 +29,7 @@ app.post('/webhook', async (req, res) => {
   const value = change?.value
   const message = value?.messages?.[0]
   if (!message || message.type !== 'text') return
-  const from = message.from
+  const from = normalizeMxPhone(message.from)
   const text = message.text.body
   const name = value.contacts?.[0]?.profile?.name || 'Cliente'
   console.log(`[${name}] ${from}: ${text}`)

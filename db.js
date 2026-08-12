@@ -41,6 +41,63 @@ export async function initDB() {
 
     CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone);
     CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+
+    -- Sistema de campañas (broadcasts) — plantillas aprobadas por Meta, campañas
+    -- reutilizables por plantilla, y el progreso de envío por contacto.
+    CREATE TABLE IF NOT EXISTS templates (
+      id SERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      language TEXT NOT NULL DEFAULT 'es_MX',
+      category TEXT NOT NULL DEFAULT 'UTILITY',
+      body_preview TEXT,
+      variables TEXT[] NOT NULL DEFAULT '{}',
+      buttons TEXT[] NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      template_id INTEGER REFERENCES templates(id),
+      audience_label TEXT,
+      status TEXT NOT NULL DEFAULT 'borrador',
+      -- borrador | enviando | pausada | completada
+      daily_cap INTEGER NOT NULL DEFAULT 25,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS campaign_contacts (
+      id SERIAL PRIMARY KEY,
+      campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      phone TEXT NOT NULL,
+      vars JSONB NOT NULL DEFAULT '{}',
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      -- pendiente | enviando | enviado | entregado | leido | respondido | fallido | opt_out
+      wamid TEXT,
+      paso_actual TEXT,
+      enviado_at TIMESTAMPTZ,
+      ultimo_evento_at TIMESTAMPTZ,
+      recordatorios INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(campaign_id, phone)
+    );
+    CREATE INDEX IF NOT EXISTS idx_campaign_contacts_campaign ON campaign_contacts(campaign_id);
+    CREATE INDEX IF NOT EXISTS idx_campaign_contacts_phone ON campaign_contacts(phone);
+    CREATE INDEX IF NOT EXISTS idx_campaign_contacts_wamid ON campaign_contacts(wamid);
+
+    CREATE TABLE IF NOT EXISTS campaign_responses (
+      id SERIAL PRIMARY KEY,
+      campaign_contact_id INTEGER NOT NULL REFERENCES campaign_contacts(id) ON DELETE CASCADE,
+      pregunta TEXT NOT NULL,
+      valor TEXT,
+      valor_num INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Opt-out global de campañas (no aplica al bot normal de servicio a cliente)
+    CREATE TABLE IF NOT EXISTS campaign_optouts (
+      phone TEXT PRIMARY KEY,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `)
 
   // Insertar etiquetas por defecto
@@ -154,6 +211,108 @@ export async function getMessages(phone, limit = 100) {
     [phone, limit]
   )
   return r.rows
+}
+
+// Plantillas de WhatsApp (deben existir ya aprobadas en Meta con este mismo nombre)
+export async function createTemplate({ name, language, category, bodyPreview, variables, buttons }) {
+  const r = await pool.query(
+    `INSERT INTO templates (name, language, category, body_preview, variables, buttons)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (name) DO UPDATE SET language=EXCLUDED.language, category=EXCLUDED.category,
+       body_preview=EXCLUDED.body_preview, variables=EXCLUDED.variables, buttons=EXCLUDED.buttons
+     RETURNING *`,
+    [name, language || 'es_MX', category || 'UTILITY', bodyPreview || null, variables || [], buttons || []]
+  )
+  return r.rows[0]
+}
+
+export async function getTemplates() {
+  const r = await pool.query(`SELECT * FROM templates ORDER BY created_at DESC`)
+  return r.rows
+}
+
+// Campañas
+export async function createCampaign({ name, templateId, audienceLabel, dailyCap }) {
+  const r = await pool.query(
+    `INSERT INTO campaigns (name, template_id, audience_label, daily_cap) VALUES ($1,$2,$3,$4) RETURNING *`,
+    [name, templateId, audienceLabel || null, dailyCap || 25]
+  )
+  return r.rows[0]
+}
+
+export async function getCampaigns() {
+  const r = await pool.query(`
+    SELECT c.*, t.name as template_name,
+      COUNT(cc.id) as total_contactos,
+      COUNT(cc.id) FILTER (WHERE cc.estado NOT IN ('pendiente','opt_out')) as ya_procesados
+    FROM campaigns c
+    LEFT JOIN templates t ON t.id = c.template_id
+    LEFT JOIN campaign_contacts cc ON cc.campaign_id = c.id
+    GROUP BY c.id, t.name
+    ORDER BY c.created_at DESC
+  `)
+  return r.rows
+}
+
+export async function getCampaign(id) {
+  const r = await pool.query(`
+    SELECT c.*, t.name as template_name, t.body_preview, t.variables, t.buttons
+    FROM campaigns c LEFT JOIN templates t ON t.id = c.template_id
+    WHERE c.id = $1
+  `, [id])
+  return r.rows[0] || null
+}
+
+export async function getCampaignContacts(campaignId) {
+  const r = await pool.query(
+    `SELECT * FROM campaign_contacts WHERE campaign_id = $1 ORDER BY id`, [campaignId]
+  )
+  return r.rows
+}
+
+export async function getCampaignStats(campaignId) {
+  const r = await pool.query(
+    `SELECT estado, COUNT(*) as n FROM campaign_contacts WHERE campaign_id = $1 GROUP BY estado`,
+    [campaignId]
+  )
+  return r.rows
+}
+
+// Arma la audiencia de una campaña a partir de una etiqueta existente, respetando opt-outs.
+// Devuelve cuántos contactos se agregaron.
+export async function addAudienceFromLabel(campaignId, labelName) {
+  const r = await pool.query(`
+    INSERT INTO campaign_contacts (campaign_id, phone, vars)
+    SELECT $1, c.phone, jsonb_build_object('nombre_corto', c.name)
+    FROM contacts c
+    JOIN contact_labels cl ON cl.phone = c.phone
+    JOIN labels l ON l.id = cl.label_id AND l.name = $2
+    WHERE NOT EXISTS (SELECT 1 FROM campaign_optouts o WHERE o.phone = c.phone)
+    ON CONFLICT (campaign_id, phone) DO NOTHING
+    RETURNING id
+  `, [campaignId, labelName])
+  return r.rowCount
+}
+
+// Cuenta cuántos contactos tiene una etiqueta, sin agregarlos aún (para la vista previa)
+export async function countLabelAudience(labelName) {
+  const r = await pool.query(`
+    SELECT COUNT(*) as n
+    FROM contacts c
+    JOIN contact_labels cl ON cl.phone = c.phone
+    JOIN labels l ON l.id = cl.label_id AND l.name = $1
+    WHERE NOT EXISTS (SELECT 1 FROM campaign_optouts o WHERE o.phone = c.phone)
+  `, [labelName])
+  return Number(r.rows[0].n)
+}
+
+export async function isOptedOut(phone) {
+  const r = await pool.query(`SELECT 1 FROM campaign_optouts WHERE phone = $1`, [phone])
+  return r.rowCount > 0
+}
+
+export async function addOptOut(phone) {
+  await pool.query(`INSERT INTO campaign_optouts (phone) VALUES ($1) ON CONFLICT DO NOTHING`, [phone])
 }
 
 export async function getRecentConversations() {

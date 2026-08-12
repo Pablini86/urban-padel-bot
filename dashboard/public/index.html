@@ -298,6 +298,10 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
           <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Contactos
         </div>
+        <div class="side-tab" id="tab-campaigns" onclick="switchTab('campaigns')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-7-7 18-2-8-8-2v-1z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Campañas
+        </div>
       </div>
 
       <!-- CHATS LIST -->
@@ -322,6 +326,14 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
       <!-- CONTACTS LIST -->
       <div id="view-contacts" style="display:none;flex-direction:column;flex:1;min-height:0">
         <div class="list-scroll" id="contacts-list"></div>
+      </div>
+
+      <!-- CAMPAIGNS LIST -->
+      <div id="view-campaigns" style="display:none;flex-direction:column;flex:1;min-height:0">
+        <div class="side-search" style="display:flex;gap:8px">
+          <button class="save-btn" style="width:auto;padding:9px 16px;white-space:nowrap" onclick="openCampaignForm()">+ Nueva campaña</button>
+        </div>
+        <div class="list-scroll" id="campaigns-list"></div>
       </div>
     </div>
 
@@ -369,6 +381,26 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
       </div>
     </div>
 
+    <!-- CAMPAIGN DETAIL -->
+    <div class="chat-pane" id="campaign-pane" style="display:none">
+      <div class="chat-placeholder" id="campaign-empty">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-7-7 18-2-8-8-2v-1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="chat-placeholder-text">Selecciona una campaña de la lista o crea una nueva</div>
+      </div>
+      <div id="campaign-active" style="display:none;flex-direction:column;height:100%">
+        <div class="chat-head">
+          <button class="back-btn" onclick="closeCampaign()">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="chat-head-info">
+            <div class="chat-head-name" id="cp-name">—</div>
+            <div class="chat-head-status" id="cp-status"></div>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:20px" id="campaign-body"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -407,6 +439,43 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
   </div>
   <div class="info-footer">
     <button class="save-btn" onclick="saveContact()">Guardar cambios</button>
+  </div>
+</div>
+
+<!-- NUEVA CAMPAÑA -->
+<div class="info-overlay" id="campaign-form-overlay" onclick="closeCampaignForm()"></div>
+<div class="info-panel" id="campaign-form-panel">
+  <div class="info-head">
+    <div class="info-title">Nueva campaña</div>
+    <button class="icon-btn" onclick="closeCampaignForm()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="info-body">
+    <div class="field-group">
+      <div class="field-label">Nombre de la campaña</div>
+      <input class="field-input" id="cf-name" placeholder="Ej. Encuesta verano 2026" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Plantilla aprobada por Meta</div>
+      <select class="field-input" id="cf-template"></select>
+      <div class="label-add" style="margin-top:8px;display:inline-block" onclick="toggleNewTemplateForm()">+ Registrar plantilla nueva</div>
+      <div class="new-label-form" id="new-template-form" style="flex-direction:column;align-items:stretch;gap:8px">
+        <input type="text" class="field-input" id="nt-name" placeholder="Nombre exacto aprobado en Meta (ej. encuesta_verano_2026)" />
+        <input type="text" class="field-input" id="nt-variables" placeholder="Variables en orden, separadas por coma (ej. nombre_corto, hijo_corto)" />
+        <input type="text" class="field-input" id="nt-buttons" placeholder="Botones, separados por coma (ej. 0-6, 7-8, 9-10)" />
+        <textarea class="field-input" id="nt-preview" placeholder="Texto del mensaje (solo de referencia, no se manda desde aquí)" style="height:60px"></textarea>
+        <button onclick="createTemplateSubmit()">Registrar plantilla</button>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Audiencia</div>
+      <select class="field-input" id="cf-audience" onchange="previewAudience()"></select>
+      <div class="field-static" id="cf-audience-count" style="margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="info-footer">
+    <button class="save-btn" onclick="createCampaignSubmit()">Crear campaña</button>
   </div>
 </div>
 
@@ -715,13 +784,152 @@ async function loadContacts() {
   }).join('')
 }
 
+const CAMPAIGN_STATUS_LABEL = { borrador: 'Borrador', enviando: 'Enviando', pausada: 'Pausada', completada: 'Completada' }
+const CAMPAIGN_STATUS_COLOR = { borrador: 'var(--faint)', enviando: 'var(--court)', pausada: 'var(--signal)', completada: 'var(--info)' }
+const CONTACT_ESTADO_LABEL = { pendiente: 'Pendiente', enviando: 'Enviando', enviado: 'Enviado', entregado: 'Entregado', leido: 'Leído', respondido: 'Respondió', fallido: 'Falló', opt_out: 'Se dio de baja' }
+const CONTACT_ESTADO_COLOR = { pendiente: 'var(--faint)', enviando: 'var(--info)', enviado: 'var(--court)', entregado: 'var(--court)', leido: 'var(--court-deep)', respondido: 'var(--court-deep)', fallido: 'var(--danger)', opt_out: 'var(--danger)' }
+
+async function loadCampaigns() {
+  const campaigns = await api('/dashboard/api/campaigns')
+  if (!campaigns) return
+  const el = document.getElementById('campaigns-list')
+  if (!campaigns.length) {
+    el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-7-7 18-2-8-8-2v-1z" stroke="currentColor" stroke-width="1.5"/></svg>
+      <div>Sin campañas todavía</div>
+      <div class="empty-sub">Crea una para mandar mensajes a un grupo de contactos a la vez.</div>
+    </div>`
+    return
+  }
+  el.innerHTML = campaigns.map(c => `
+    <div class="contact-item" onclick="openCampaign(${c.id})">
+      <div class="avatar">
+        <svg viewBox="0 0 24 24" fill="none" style="width:18px;height:18px"><path d="M3 11l18-7-7 18-2-8-8-2v-1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="contact-name">${esc(c.name)}</div>
+        <div class="contact-phone">${c.template_name || 'sin plantilla'} · ${c.total_contactos} contactos</div>
+      </div>
+      <span class="tag" style="background:${CAMPAIGN_STATUS_COLOR[c.status]}22;color:${CAMPAIGN_STATUS_COLOR[c.status]}">${CAMPAIGN_STATUS_LABEL[c.status] || c.status}</span>
+    </div>`).join('')
+}
+
+async function openCampaign(id) {
+  const c = await api(`/dashboard/api/campaigns/${id}`)
+  if (!c) return
+  document.getElementById('campaign-empty').style.display = 'none'
+  document.getElementById('campaign-active').style.display = 'flex'
+  document.getElementById('cp-name').textContent = c.name
+  document.getElementById('cp-status').textContent = `${CAMPAIGN_STATUS_LABEL[c.status] || c.status} · plantilla ${c.template_name || '—'}`
+  const statsHTML = (c.stats || []).map(s =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line-2)">
+      <span class="tag" style="background:${CONTACT_ESTADO_COLOR[s.estado]}22;color:${CONTACT_ESTADO_COLOR[s.estado]}">${CONTACT_ESTADO_LABEL[s.estado] || s.estado}</span>
+      <span style="font-size:13px;color:var(--slate)">${s.n} contacto${s.n==1?'':'s'}</span>
+    </div>`).join('') || '<div class="field-static">Sin contactos en esta campaña todavía.</div>'
+  const contactsHTML = (c.contacts || []).map(cc =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line-2)">
+      <span class="mono" style="font-size:13px">${fmt(cc.phone)}</span>
+      <span class="tag" style="background:${CONTACT_ESTADO_COLOR[cc.estado]}22;color:${CONTACT_ESTADO_COLOR[cc.estado]}">${CONTACT_ESTADO_LABEL[cc.estado] || cc.estado}</span>
+    </div>`).join('') || ''
+  document.getElementById('campaign-body').innerHTML = `
+    <div class="field-label" style="margin-bottom:8px">Resumen</div>
+    ${statsHTML}
+    <div class="field-label" style="margin:20px 0 4px">Contactos (${(c.contacts||[]).length})</div>
+    ${contactsHTML}
+  `
+  document.getElementById('campaign-pane').classList.add('open')
+  document.getElementById('sidebar').classList.add('hide')
+  document.body.classList.add('chat-open')
+}
+
+function closeCampaign() {
+  document.getElementById('campaign-pane').classList.remove('open')
+  document.getElementById('sidebar').classList.remove('hide')
+  document.body.classList.remove('chat-open')
+}
+
+async function openCampaignForm() {
+  const [templates, labels] = await Promise.all([
+    api('/dashboard/api/templates'),
+    api('/dashboard/api/labels')
+  ])
+  const tSel = document.getElementById('cf-template')
+  tSel.innerHTML = templates?.length
+    ? templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')
+    : `<option value="">— registra una plantilla primero —</option>`
+  const aSel = document.getElementById('cf-audience')
+  aSel.innerHTML = `<option value="">— selecciona una etiqueta —</option>` +
+    (labels || []).map(l => `<option value="${esc(l.name)}">${esc(l.name)}</option>`).join('')
+  document.getElementById('cf-audience-count').textContent = ''
+  document.getElementById('cf-name').value = ''
+  document.getElementById('new-template-form').classList.remove('open')
+  document.getElementById('campaign-form-panel').classList.add('open')
+  document.getElementById('campaign-form-overlay').classList.add('open')
+}
+
+function closeCampaignForm() {
+  document.getElementById('campaign-form-panel').classList.remove('open')
+  document.getElementById('campaign-form-overlay').classList.remove('open')
+}
+
+function toggleNewTemplateForm() {
+  document.getElementById('new-template-form').classList.toggle('open')
+}
+
+async function createTemplateSubmit() {
+  const name = document.getElementById('nt-name').value.trim()
+  if (!name) return
+  const template = await api('/dashboard/api/templates', 'POST', {
+    name,
+    variables: document.getElementById('nt-variables').value,
+    buttons: document.getElementById('nt-buttons').value,
+    bodyPreview: document.getElementById('nt-preview').value
+  })
+  if (!template) return
+  document.getElementById('nt-name').value = ''
+  document.getElementById('nt-variables').value = ''
+  document.getElementById('nt-buttons').value = ''
+  document.getElementById('nt-preview').value = ''
+  document.getElementById('new-template-form').classList.remove('open')
+  const tSel = document.getElementById('cf-template')
+  tSel.innerHTML = (await api('/dashboard/api/templates')).map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')
+  tSel.value = template.id
+  showNotif('Plantilla registrada', name)
+}
+
+async function previewAudience() {
+  const label = document.getElementById('cf-audience').value
+  const el = document.getElementById('cf-audience-count')
+  if (!label) { el.textContent = ''; return }
+  el.textContent = 'Contando...'
+  const r = await api(`/dashboard/api/audience-preview?label=${encodeURIComponent(label)}`)
+  el.textContent = r ? `${r.count} contacto${r.count===1?'':'s'} con la etiqueta "${label}"` : ''
+}
+
+async function createCampaignSubmit() {
+  const name = document.getElementById('cf-name').value.trim()
+  const templateId = document.getElementById('cf-template').value
+  const audienceLabel = document.getElementById('cf-audience').value
+  if (!name || !templateId) { showNotif('Falta información', 'Ponle nombre a la campaña y elige una plantilla'); return }
+  const campaign = await api('/dashboard/api/campaigns', 'POST', { name, templateId, audienceLabel })
+  if (!campaign) return
+  closeCampaignForm()
+  loadCampaigns()
+  showNotif('Campaña creada', name)
+}
+
 function switchTab(name) {
   activeTab = name
   document.getElementById('tab-chats').classList.toggle('active', name==='chats')
   document.getElementById('tab-contacts').classList.toggle('active', name==='contacts')
+  document.getElementById('tab-campaigns').classList.toggle('active', name==='campaigns')
   document.getElementById('view-chats').style.display = name==='chats' ? 'flex' : 'none'
   document.getElementById('view-contacts').style.display = name==='contacts' ? 'flex' : 'none'
+  document.getElementById('view-campaigns').style.display = name==='campaigns' ? 'flex' : 'none'
+  document.getElementById('chat-pane').style.display = name==='campaigns' ? 'none' : 'flex'
+  document.getElementById('campaign-pane').style.display = name==='campaigns' ? 'flex' : 'none'
   if (name === 'contacts') loadContacts()
+  if (name === 'campaigns') loadCampaigns()
 }
 
 function autoResize(el) {
@@ -741,8 +949,12 @@ async function api(url, method='GET', body=null) {
 
 function fmt(phone) {
   if (!phone) return ''
-  if (phone.startsWith('52') && phone.length === 12)
-    return `+52 ${phone.slice(2,4)} ${phone.slice(4,8)} ${phone.slice(8)}`
+  // El '1' extra tras el 52 es una rareza de la API de WhatsApp para México,
+  // no parte del número real — se quita solo para mostrarlo bonito.
+  let d = phone
+  if (d.startsWith('521') && d.length === 13) d = '52' + d.slice(3)
+  if (d.startsWith('52') && d.length === 12)
+    return `+52 ${d.slice(2,4)} ${d.slice(4,8)} ${d.slice(8)}`
   return `+${phone}`
 }
 
