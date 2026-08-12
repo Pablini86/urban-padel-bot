@@ -38,6 +38,13 @@ function utcToMexico(utcStr) {
   return new Date(d.getTime() - 6 * 60 * 60 * 1000)
 }
 
+// Dado un slot "HH:MM", devuelve el slot de 30 min siguiente
+function nextSlot(slot) {
+  const [h, m] = slot.split(':').map(Number)
+  const total = h * 60 + m + 30
+  return `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`
+}
+
 export async function getAvailability(daysAhead = 1) {
   if (!CLIENT_ID || !CLIENT_SECRET || !TENANT_ID) {
     console.warn('[Playtomic] Variables de entorno faltantes')
@@ -137,23 +144,21 @@ export async function getAvailability(daysAhead = 1) {
       const availableSlots = allSlots.filter(slot => {
         return courts.some(courtName => {
           const cId = courtIds[courtName]
-          const [h, m] = slot.split(':').map(Number)
           // Verificar slot actual y siguiente (60 min = 2 slots de 30 min)
-          const slot2m = m + 30 >= 60 ? `${(h+1).toString().padStart(2,'0')}:${((m+30)%60).toString().padStart(2,'0')}` : `${h.toString().padStart(2,'0')}:${(m+30).toString().padStart(2,'0')}`
+          const slot2 = nextSlot(slot)
           if (!cId) return true
-          return !courtOccupied[cId]?.has(slot) && !courtOccupied[cId]?.has(slot2m)
+          return !courtOccupied[cId]?.has(slot) && !courtOccupied[cId]?.has(slot2)
         })
       })
 
       // Para cada slot disponible, qué canchas tienen 60 min libres
       const slotCourts = {}
       for (const slot of availableSlots) {
-        const [h, m] = slot.split(':').map(Number)
-        const slot2m = m + 30 >= 60 ? `${(h+1).toString().padStart(2,'0')}:${((m+30)%60).toString().padStart(2,'0')}` : `${h.toString().padStart(2,'0')}:${(m+30).toString().padStart(2,'0')}`
+        const slot2 = nextSlot(slot)
         const free = courts.filter(courtName => {
           const cId = courtIds[courtName]
           if (!cId) return true
-          return !courtOccupied[cId]?.has(slot) && !courtOccupied[cId]?.has(slot2m)
+          return !courtOccupied[cId]?.has(slot) && !courtOccupied[cId]?.has(slot2)
         })
         slotCourts[slot] = free
       }

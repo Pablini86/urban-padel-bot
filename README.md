@@ -12,13 +12,17 @@ Copia `.env.example` a `.env` y llena los valores:
 | `PHONE_NUMBER_ID` | Meta for Developers → WhatsApp → API Setup |
 | `WEBHOOK_VERIFY_TOKEN` | Tú lo inventas (ej. `urban_padel_2025`) |
 | `ANTHROPIC_API_KEY` | console.anthropic.com |
+| `PLAYTOMIC_CLIENT_ID` | Credenciales de partner de Playtomic |
+| `PLAYTOMIC_CLIENT_SECRET` | Credenciales de partner de Playtomic |
 | `PLAYTOMIC_TENANT_ID` | URL de tu club en playtomic.io/clubs/**ESTE-ID** |
+| `DATABASE_URL` | Railway la genera sola al agregar un plugin de Postgres |
+| `DASHBOARD_PASSWORD` | Tú la inventas — es el password para entrar al dashboard de conversaciones (mismo para las 3 cuentas) |
 
 ## Despliegue en Railway
 
 1. Sube este repo a GitHub
 2. En Railway: New Project → Deploy from GitHub
-3. Agrega las variables de entorno en Settings → Variables
+3. Agrega las variables de entorno en Settings → Variables (incluyendo `DASHBOARD_PASSWORD`, si no nadie puede iniciar sesión en el dashboard)
 4. Railway genera una URL pública automáticamente
 
 ## Endpoint del webhook

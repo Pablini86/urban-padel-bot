@@ -12,16 +12,20 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const USERS = {
-  'castellanosmt@gmail.com': { name: 'Teresa Castellanos', password: 'urban2025' },
-  'pablolc20111@gmail.com': { name: 'Pablo Lemus', password: 'urban2025' },
-  'contacto@urbanpadellife.com': { name: 'Urban Pádel', password: 'urban2025' }
+// Mismo password para las 3 cuentas, tomado de la variable de entorno DASHBOARD_PASSWORD
+const USER_NAMES = {
+  'castellanosmt@gmail.com': 'Teresa Castellanos',
+  'pablolc20111@gmail.com': 'Pablo Lemus',
+  'contacto@urbanpadellife.com': 'Urban Pádel'
 }
 
 export let dashboardIO = null
 export const humanControl = new Set()
 
 export async function initDashboard(app, conversations) {
+  if (!process.env.DASHBOARD_PASSWORD) {
+    console.warn('[Dashboard] ADVERTENCIA: falta DASHBOARD_PASSWORD, nadie podrá iniciar sesión')
+  }
   await initDB()
 
   const httpServer = createServer(app)
@@ -32,11 +36,11 @@ export async function initDashboard(app, conversations) {
 
   app.post('/dashboard/login', express.json(), (req, res) => {
     const { email, password } = req.body
-    const user = USERS[email]
-    if (user && user.password === password) {
+    const name = USER_NAMES[email]
+    if (name && password && password === process.env.DASHBOARD_PASSWORD) {
       const token = Math.random().toString(36).slice(2) + Date.now()
-      sessions.set(token, { email, name: user.name })
-      res.json({ ok: true, token, name: user.name })
+      sessions.set(token, { email, name })
+      res.json({ ok: true, token, name })
     } else {
       res.status(401).json({ ok: false, error: 'Credenciales incorrectas' })
     }
