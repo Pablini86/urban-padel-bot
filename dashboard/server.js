@@ -4,11 +4,12 @@ import { Server } from 'socket.io'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { sendWhatsApp } from '../whatsapp.js'
+import { submitTemplateToMeta, checkTemplateStatus } from '../meta-templates.js'
 import {
   initDB, upsertContact, updateContact, getContact, markConversationOpened,
   getAllContacts, getAllLabels, setContactLabels, createLabel,
   saveMessage, getMessages, getRecentConversations,
-  createTemplate, getTemplates,
+  createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus,
   createCampaign, getCampaigns, getCampaign, getCampaignContacts, getCampaignStats,
   addAudienceFromLabel, countLabelAudience
 } from '../db.js'
@@ -140,20 +141,49 @@ export async function initDashboard(app, conversations) {
     res.json(label)
   }))
 
-  // Plantillas de WhatsApp (deben estar ya aprobadas en Meta con este mismo nombre)
+  // Plantillas de WhatsApp — se registran aquí y de una vez se mandan a revisión de Meta
   app.get('/dashboard/api/templates', auth, ah(async (req, res) => {
     res.json(await getTemplates())
   }))
 
   app.post('/dashboard/api/templates', auth, express.json(), ah(async (req, res) => {
-    const { name, language, category, bodyPreview, variables, buttons } = req.body
-    if (!name?.trim()) return res.status(400).json({ error: 'Falta el nombre exacto de la plantilla aprobada en Meta' })
+    const { name, bodyPreview, variables, buttons, examples } = req.body
+    if (!name?.trim()) return res.status(400).json({ error: 'Falta el nombre de la plantilla' })
+    if (!bodyPreview?.trim()) return res.status(400).json({ error: 'Falta el texto del mensaje' })
+    const variableList = (variables || '').split(',').map(v => v.trim()).filter(Boolean)
+    const buttonList = (buttons || '').split(',').map(v => v.trim()).filter(Boolean)
+    const exampleList = (examples || '').split(',').map(v => v.trim()).filter(Boolean)
+
     const template = await createTemplate({
-      name: name.trim(), language, category, bodyPreview,
-      variables: (variables || '').split(',').map(v => v.trim()).filter(Boolean),
-      buttons: (buttons || '').split(',').map(v => v.trim()).filter(Boolean)
+      name: name.trim(), language: 'es_MX', category: 'UTILITY',
+      bodyPreview: bodyPreview.trim(), variables: variableList, buttons: buttonList
     })
-    res.json(template)
+
+    try {
+      const { metaTemplateId, status } = await submitTemplateToMeta({
+        name: name.trim(), language: 'es_MX', category: 'UTILITY',
+        bodyText: bodyPreview.trim(), variableExamples: exampleList, buttons: buttonList
+      })
+      await setTemplateSubmitted(template.id, { metaTemplateId, status })
+    } catch (err) {
+      await setTemplateError(template.id, err.message)
+    }
+
+    res.json(await getTemplate(template.id))
+  }))
+
+  // Vuelve a preguntarle a Meta si ya aprobó/rechazó una plantilla
+  app.post('/dashboard/api/templates/:id/refresh-status', auth, ah(async (req, res) => {
+    const template = await getTemplate(req.params.id)
+    if (!template) return res.status(404).json({ error: 'No existe esa plantilla' })
+    if (!template.meta_template_id) return res.status(400).json({ error: 'Esta plantilla nunca se mandó a Meta' })
+    try {
+      const { status, rejectedReason } = await checkTemplateStatus(template.meta_template_id)
+      await setTemplateStatus(template.id, { status, rejectedReason })
+    } catch (err) {
+      return res.status(502).json({ error: err.message })
+    }
+    res.json(await getTemplate(template.id))
   }))
 
   // Campañas

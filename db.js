@@ -52,8 +52,15 @@ export async function initDB() {
       body_preview TEXT,
       variables TEXT[] NOT NULL DEFAULT '{}',
       buttons TEXT[] NOT NULL DEFAULT '{}',
+      meta_template_id TEXT,
+      approval_status TEXT NOT NULL DEFAULT 'no_enviada',
+      -- no_enviada | pendiente | approved | rejected | error
+      approval_error TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+    ALTER TABLE templates ADD COLUMN IF NOT EXISTS meta_template_id TEXT;
+    ALTER TABLE templates ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'no_enviada';
+    ALTER TABLE templates ADD COLUMN IF NOT EXISTS approval_error TEXT;
 
     CREATE TABLE IF NOT EXISTS campaigns (
       id SERIAL PRIMARY KEY,
@@ -229,6 +236,32 @@ export async function createTemplate({ name, language, category, bodyPreview, va
 export async function getTemplates() {
   const r = await pool.query(`SELECT * FROM templates ORDER BY created_at DESC`)
   return r.rows
+}
+
+export async function getTemplate(id) {
+  const r = await pool.query(`SELECT * FROM templates WHERE id = $1`, [id])
+  return r.rows[0] || null
+}
+
+export async function setTemplateSubmitted(id, { metaTemplateId, status }) {
+  await pool.query(
+    `UPDATE templates SET meta_template_id = $2, approval_status = $3, approval_error = NULL WHERE id = $1`,
+    [id, metaTemplateId, status]
+  )
+}
+
+export async function setTemplateError(id, errorMessage) {
+  await pool.query(
+    `UPDATE templates SET approval_status = 'error', approval_error = $2 WHERE id = $1`,
+    [id, errorMessage]
+  )
+}
+
+export async function setTemplateStatus(id, { status, rejectedReason }) {
+  await pool.query(
+    `UPDATE templates SET approval_status = $2, approval_error = $3 WHERE id = $1`,
+    [id, status, rejectedReason || null]
+  )
 }
 
 // Campañas
