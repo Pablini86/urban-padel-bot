@@ -3,138 +3,227 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Urban Pádel — Mensajes</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<title>Urban Pádel — Panel</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
 :root{
-  --bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;--bg4:#222;
-  --border:#252525;--border2:#2e2e2e;
-  --text:#f5f5f5;--text2:#999;--text3:#666;
-  --green:#22c55e;--green2:#16a34a;
-  --orange:#f97316;--red:#ef4444;--blue:#3b82f6;
-  --purple:#a855f7;--yellow:#eab308;
-  --r:14px;--rs:8px;
+  --ink:#12181B;
+  --slate:#5C6670;
+  --faint:#8F979D;
+  --canvas:#F2F3F0;
+  --surface:#FFFFFF;
+  --surface-2:#F8F9F7;
+  --line:#E3E5E0;
+  --line-2:#ECEDE9;
+  --court:#17824A;
+  --court-deep:#0F5C33;
+  --court-soft:#E7F3EC;
+  --signal:#DD6B20;
+  --signal-soft:#FCEEE2;
+  --danger:#D14545;
+  --danger-soft:#FBEAEA;
+  --shadow-1: 0 1px 2px rgba(18,24,27,.05);
+  --shadow-2: 0 10px 30px rgba(18,24,27,.12);
+  --shadow-3: 0 20px 50px rgba(18,24,27,.22);
+  --r-sm:8px; --r-md:12px; --r-lg:18px; --r-full:999px;
+  --ease: cubic-bezier(.22,.9,.32,1.1);
 }
-html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
 
-/* LOGIN */
-#login{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg)}
-.login-card{width:min(380px,90vw);padding:40px 32px;background:var(--bg2);border:1px solid var(--border);border-radius:20px}
-.lc-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px}
-.lc-dot{width:32px;height:32px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
-.lc-name{font-size:15px;font-weight:700;letter-spacing:-.3px}
-.lc-sub{font-size:12px;color:var(--text2);margin-top:1px}
-.lc-title{font-size:22px;font-weight:700;margin-bottom:24px}
-.lc-field{width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text);font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;transition:border-color .2s}
-.lc-field:focus{border-color:var(--green)}
-.lc-btn{width:100%;padding:13px;background:var(--green);color:#000;border:none;border-radius:var(--rs);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;transition:background .2s}
-.lc-btn:hover{background:var(--green2)}
-.lc-err{color:var(--red);font-size:13px;margin-top:8px;display:none}
+html,body{height:100%}
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--canvas);
+  color:var(--ink);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'JetBrains Mono',monospace}
+button{font-family:inherit}
+button:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid var(--court); outline-offset:2px;
+}
+::selection{background:var(--court-soft);color:var(--court-deep)}
 
-/* APP LAYOUT */
+/* ---------- BRAND MARK ---------- */
+.mark{width:34px;height:34px;border-radius:10px;background:var(--court);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mark svg{width:18px;height:18px}
+
+/* ---------- LOGIN ---------- */
+#login{display:flex;align-items:center;justify-content:center;height:100vh;background:
+  radial-gradient(circle at 15% 15%, #E7F3EC 0%, transparent 45%),
+  radial-gradient(circle at 85% 85%, #FCEEE2 0%, transparent 45%),
+  var(--canvas);
+}
+.login-card{width:min(380px,90vw);padding:36px 32px;background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow-2)}
+.lc-brand{display:flex;align-items:center;gap:11px;margin-bottom:30px}
+.lc-name{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:-.2px}
+.lc-sub{font-size:12px;color:var(--faint);margin-top:1px}
+.lc-title{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;margin-bottom:6px;letter-spacing:-.3px}
+.lc-hint{font-size:13px;color:var(--slate);margin-bottom:24px}
+.lc-field{width:100%;padding:12px 14px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);color:var(--ink);font-family:inherit;font-size:14px;outline:none;margin-bottom:10px;transition:border-color .15s,background .15s}
+.lc-field:focus{border-color:var(--court);background:var(--surface)}
+.lc-btn{width:100%;padding:13px;background:var(--ink);color:#fff;border:none;border-radius:var(--r-sm);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .15s,transform .1s}
+.lc-btn:hover{background:var(--court-deep)}
+.lc-btn:active{transform:scale(.98)}
+.lc-err{display:flex;align-items:center;gap:6px;color:var(--danger);font-size:13px;margin-top:12px;display:none}
+
+/* ---------- APP SHELL ---------- */
 #app{display:none;height:100vh;flex-direction:column}
-.topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
-.topbar-logo{font-size:13px;font-weight:700;letter-spacing:-.3px}
-.topbar-dot{width:8px;height:8px;background:var(--green);border-radius:50%}
-.topbar-agent{font-size:12px;color:var(--text2);margin-left:auto}
+.topbar{height:56px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0}
+.topbar-name{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:-.2px}
+.topbar-sub{font-size:11px;color:var(--faint);margin-top:-1px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.topbar-agent{font-size:13px;color:var(--slate);display:flex;align-items:center;gap:8px}
+.agent-dot{width:7px;height:7px;border-radius:50%;background:var(--court)}
+.icon-btn{width:34px;height:34px;border-radius:var(--r-sm);border:1px solid transparent;background:transparent;color:var(--slate);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+.icon-btn svg{width:18px;height:18px}
 
-/* TABS */
-.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
-.tab{flex:1;padding:10px;text-align:center;font-size:12px;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
-.tab.active{color:var(--green);border-bottom-color:var(--green)}
+.workspace{flex:1;display:flex;overflow:hidden;min-height:0}
 
-/* PANEL */
-.panel{flex:1;overflow:hidden;position:relative}
-.view{position:absolute;inset:0;overflow-y:auto;display:none}
-.view.active{display:block}
-.view::-webkit-scrollbar{width:3px}
-.view::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
-
-/* CONV LIST */
-.conv-filters{padding:10px 12px;display:flex;gap:8px;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+/* ---------- SIDEBAR ---------- */
+.sidebar{width:340px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.side-tabs{display:flex;gap:4px;padding:12px 12px 0}
+.side-tab{flex:1;padding:9px 0;text-align:center;font-size:12.5px;font-weight:600;color:var(--faint);cursor:pointer;border-radius:var(--r-sm);transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.side-tab svg{width:15px;height:15px}
+.side-tab.active{color:var(--ink);background:var(--surface-2)}
+.side-search{padding:12px}
+.search-wrap{position:relative}
+.search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--faint)}
+.search-input{width:100%;padding:9px 12px 9px 34px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-full);font-family:inherit;font-size:13px;color:var(--ink);outline:none;transition:border-color .15s}
+.search-input:focus{border-color:var(--court);background:var(--surface)}
+.conv-filters{padding:0 12px 12px;display:flex;gap:6px;overflow-x:auto;flex-shrink:0}
 .conv-filters::-webkit-scrollbar{display:none}
-.filter-chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);color:var(--text2);white-space:nowrap;transition:all .2s;background:transparent}
-.filter-chip.active{background:var(--green);color:#000;border-color:var(--green)}
+.filter-chip{padding:5px 12px;border-radius:var(--r-full);font-size:11.5px;font-weight:600;cursor:pointer;border:1px solid var(--line);color:var(--slate);white-space:nowrap;transition:all .15s;background:var(--surface)}
+.filter-chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 
-.conv-item{padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;display:flex;gap:12px;align-items:flex-start}
-.conv-item:hover,.conv-item.active{background:var(--bg3)}
-.conv-avatar{width:40px;height:40px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.list-scroll{flex:1;overflow-y:auto;min-height:0}
+.list-scroll::-webkit-scrollbar{width:6px}
+.list-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+.conv-item{padding:12px 16px;border-bottom:1px solid var(--line-2);cursor:pointer;display:flex;gap:11px;align-items:flex-start;transition:background .12s;position:relative}
+.conv-item:hover{background:var(--surface-2)}
+.conv-item.active{background:var(--court-soft)}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--slate);flex-shrink:0}
 .conv-body{flex:1;min-width:0}
-.conv-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
-.conv-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
-.conv-time{font-size:11px;color:var(--text3)}
-.conv-preview{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.conv-tags{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
-.tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px}
-.mode-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:16px}
+.conv-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:3px}
+.conv-name{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-time{font-size:10.5px;color:var(--faint);flex-shrink:0;font-family:'JetBrains Mono',monospace}
+.conv-preview{font-size:12.5px;color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.tag{font-size:9.5px;font-weight:700;letter-spacing:.2px;text-transform:uppercase;padding:2px 7px;border-radius:20px}
+.state-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.state-dot.bot{background:var(--court);box-shadow:0 0 0 3px var(--court-soft)}
+.state-dot.human{background:var(--signal);box-shadow:0 0 0 3px var(--signal-soft)}
 
-/* CHAT */
-.chat-wrap{display:none;flex-direction:column;height:100%;position:absolute;inset:0;background:var(--bg);z-index:10}
-.chat-wrap.open{display:flex}
-.chat-head{padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
-.back-btn{width:32px;height:32px;border-radius:50%;background:var(--bg3);border:none;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+/* ---------- CHAT ---------- */
+.chat-pane{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--canvas)}
+.chat-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--faint)}
+.chat-placeholder svg{width:44px;height:44px;opacity:.5}
+.chat-placeholder-text{font-size:13.5px;max-width:220px;text-align:center;line-height:1.5}
+
+.chat-head{padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.back-btn{display:none;width:32px;height:32px;border-radius:50%;background:var(--surface-2);border:none;color:var(--ink);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
+.back-btn svg{width:17px;height:17px}
 .chat-head-info{flex:1;min-width:0}
-.chat-head-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chat-head-status{font-size:11px;color:var(--text2);margin-top:1px}
-.ctrl-btn{padding:6px 14px;border-radius:20px;border:none;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
-.ctrl-btn.take{background:var(--orange);color:#fff}
-.ctrl-btn.release{background:var(--bg4);color:var(--text);border:1px solid var(--border2)}
-.info-btn{width:32px;height:32px;border-radius:50%;background:var(--bg3);border:none;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.chat-head-name{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-head-status{font-size:11.5px;color:var(--slate);margin-top:1px;display:flex;align-items:center;gap:5px}
+.chat-head-status .dot{width:6px;height:6px;border-radius:50%}
 
-.chat-msgs{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:8px}
-.chat-msgs::-webkit-scrollbar{display:none}
-.msg{display:flex;flex-direction:column;max-width:78%}
+/* control switch — signature element */
+.ctrl-switch{position:relative;width:96px;height:32px;border-radius:var(--r-full);border:none;cursor:pointer;flex-shrink:0;background:var(--court);transition:background .28s var(--ease);padding:3px}
+.ctrl-switch.human{background:var(--signal)}
+.ctrl-knob{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .32s var(--ease);display:flex;align-items:center;justify-content:center}
+.ctrl-switch.human .ctrl-knob{transform:translateX(64px)}
+.ctrl-knob svg{width:13px;height:13px;color:var(--ink)}
+.ctrl-label{position:absolute;top:0;height:100%;display:flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#fff;transition:opacity .2s}
+.ctrl-label.l{left:10px}
+.ctrl-label.r{right:9px}
+
+.info-btn{width:34px;height:34px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);color:var(--slate);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.info-btn:hover{color:var(--ink);border-color:var(--faint)}
+.info-btn svg{width:15px;height:15px}
+
+.chat-msgs{flex:1;overflow-y:auto;padding:20px 18px;display:flex;flex-direction:column;gap:3px}
+.chat-msgs::-webkit-scrollbar{width:6px}
+.chat-msgs::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.day-sep{align-self:center;font-size:10.5px;font-weight:600;color:var(--faint);background:var(--surface);border:1px solid var(--line);padding:4px 12px;border-radius:var(--r-full);margin:14px 0 10px}
+.msg{display:flex;flex-direction:column;max-width:70%;margin-top:9px}
 .msg.user{align-self:flex-start}
 .msg.assistant,.msg.human{align-self:flex-end}
-.msg-bubble{padding:10px 13px;font-size:14px;line-height:1.5;border-radius:14px;word-break:break-word}
-.msg.user .msg-bubble{background:var(--bg3);border-bottom-left-radius:4px}
-.msg.assistant .msg-bubble{background:#0d2d1a;color:#d1fae5;border-bottom-right-radius:4px}
-.msg.human .msg-bubble{background:#2d1a0d;color:#fed7aa;border-bottom-right-radius:4px}
-.msg-label{font-size:10px;color:var(--text3);margin-top:3px;padding:0 3px}
+.msg-bubble{padding:10px 14px;font-size:13.5px;line-height:1.55;border-radius:var(--r-md);word-break:break-word;box-shadow:var(--shadow-1)}
+.msg.user .msg-bubble{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.assistant .msg-bubble{background:var(--court);color:#fff;border-bottom-right-radius:4px}
+.msg.human .msg-bubble{background:var(--signal);color:#fff;border-bottom-right-radius:4px}
+.msg-label{font-size:10px;color:var(--faint);margin-top:4px;padding:0 4px}
 .msg.assistant .msg-label,.msg.human .msg-label{text-align:right}
 
-.chat-footer{padding:10px 12px;background:var(--bg2);border-top:1px solid var(--border)}
-.bot-notice{text-align:center;font-size:12px;color:var(--text3);padding:6px}
-.input-row{display:flex;gap:8px;align-items:flex-end}
-.msg-input{flex:1;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:22px;color:var(--text);font-family:inherit;font-size:14px;outline:none;resize:none;max-height:100px;line-height:1.4;transition:border-color .2s}
-.msg-input:focus{border-color:var(--green)}
-.send-btn{width:40px;height:40px;border-radius:50%;background:var(--green);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:background .2s}
-.send-btn:hover{background:var(--green2)}
-.send-btn:disabled{background:var(--border2);cursor:not-allowed}
+.chat-footer{padding:12px 16px;background:var(--surface);border-top:1px solid var(--line);flex-shrink:0}
+.bot-notice{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;color:var(--faint);padding:8px}
+.bot-notice svg{width:14px;height:14px}
+.input-row{display:none;gap:10px;align-items:flex-end}
+.input-row.show{display:flex}
+.msg-input{flex:1;padding:11px 15px;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;color:var(--ink);font-family:inherit;font-size:13.5px;outline:none;resize:none;max-height:100px;line-height:1.4;transition:border-color .15s}
+.msg-input:focus{border-color:var(--signal);background:var(--surface)}
+.send-btn{width:38px;height:38px;border-radius:50%;background:var(--signal);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,transform .1s;color:#fff}
+.send-btn:hover{background:#C25A18}
+.send-btn:active{transform:scale(.94)}
+.send-btn svg{width:16px;height:16px}
+.send-btn:disabled{background:var(--line);cursor:not-allowed}
 
-/* CONTACT INFO SHEET */
-.info-sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:20px 16px 32px;transform:translateY(100%);transition:transform .3s;z-index:100;max-height:85vh;overflow-y:auto}
-.info-sheet.open{transform:translateY(0)}
-.sheet-handle{width:36px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 20px}
-.sheet-title{font-size:16px;font-weight:700;margin-bottom:16px}
-.field-group{margin-bottom:14px}
-.field-label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
-.field-input{width:100%;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text);font-family:inherit;font-size:14px;outline:none}
-.field-input:focus{border-color:var(--green)}
-textarea.field-input{resize:none;height:80px;line-height:1.5}
-.labels-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-.label-toggle{padding:6px 14px;border-radius:20px;border:2px solid transparent;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;opacity:.5}
-.label-toggle.on{opacity:1}
-.save-btn{width:100%;padding:13px;background:var(--green);color:#000;border:none;border-radius:var(--rs);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px}
+/* ---------- CONTACT PANEL ---------- */
+.info-overlay{position:fixed;inset:0;background:rgba(18,24,27,.35);z-index:98;opacity:0;pointer-events:none;transition:opacity .2s}
+.info-overlay.open{opacity:1;pointer-events:auto}
+.info-panel{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:var(--surface);border-left:1px solid var(--line);z-index:99;transform:translateX(100%);transition:transform .28s var(--ease);display:flex;flex-direction:column;box-shadow:var(--shadow-3)}
+.info-panel.open{transform:translateX(0)}
+.info-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.info-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600}
+.info-body{padding:20px;overflow-y:auto;flex:1}
+.field-group{margin-bottom:18px}
+.field-label{font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.field-static{font-size:14px;color:var(--slate)}
+.field-input{width:100%;padding:10px 13px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);color:var(--ink);font-family:inherit;font-size:13.5px;outline:none;transition:border-color .15s}
+.field-input:focus{border-color:var(--court);background:var(--surface)}
+textarea.field-input{resize:none;height:76px;line-height:1.5}
+.labels-grid{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
+.label-toggle{padding:6px 13px;border-radius:var(--r-full);border:1.5px solid var(--line);font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s;color:var(--slate);background:var(--surface)}
+.label-toggle.on{border-color:transparent;color:#fff}
+.info-footer{padding:16px 20px;border-top:1px solid var(--line);flex-shrink:0}
+.save-btn{width:100%;padding:12px;background:var(--ink);color:#fff;border:none;border-radius:var(--r-sm);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .15s}
+.save-btn:hover{background:var(--court-deep)}
 
-/* CONTACTS VIEW */
-.section-title{padding:16px 16px 8px;font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px}
-.contact-item{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;cursor:pointer}
-.contact-item:hover{background:var(--bg3)}
-.contact-avatar{width:40px;height:40px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:18px}
-.contact-name{font-size:14px;font-weight:600}
-.contact-phone{font-size:12px;color:var(--text2);font-family:monospace;margin-top:2px}
+/* ---------- CONTACTS VIEW ---------- */
+.section-title{padding:16px 16px 8px;font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
+.contact-item{padding:12px 16px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:12px;cursor:pointer;transition:background .12s}
+.contact-item:hover{background:var(--surface-2)}
+.contact-name{font-size:13.5px;font-weight:600}
+.contact-phone{font-size:11.5px;color:var(--faint);font-family:'JetBrains Mono',monospace;margin-top:2px}
 
-/* NOTIFICATION */
-.notif{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--green);border-radius:12px;padding:12px 16px;z-index:200;min-width:260px;max-width:90vw;animation:notifIn .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.5)}
-.notif-t{font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px}
-.notif-b{font-size:13px}
-@keyframes notifIn{from{opacity:0;top:0}to{opacity:1;top:16px}}
+/* ---------- NOTIFICATION ---------- */
+.notif{position:fixed;top:18px;right:18px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--court);border-radius:var(--r-md);padding:13px 16px;z-index:200;min-width:260px;max-width:340px;box-shadow:var(--shadow-3);animation:notifIn .3s var(--ease)}
+.notif-t{font-size:11.5px;font-weight:700;color:var(--court-deep);margin-bottom:3px}
+.notif-b{font-size:13px;color:var(--ink)}
+@keyframes notifIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
-.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;color:var(--text3);gap:12px}
-.empty-icon{font-size:40px;opacity:.3}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;color:var(--faint);gap:12px;padding:0 30px;text-align:center}
+.empty svg{width:38px;height:38px;opacity:.5}
+.empty-sub{font-size:12.5px;line-height:1.5}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width:880px){
+  .sidebar{position:absolute;inset:0;width:100%;z-index:5;transition:transform .28s var(--ease)}
+  .sidebar.hide{transform:translateX(-100%)}
+  .chat-pane{position:absolute;inset:0;transform:translateX(100%);transition:transform .28s var(--ease);z-index:6}
+  .chat-pane.open{transform:translateX(0)}
+  .back-btn{display:flex}
+  .workspace{position:relative}
+  .msg{max-width:84%}
+  .info-panel{width:100%;max-width:100%}
+  body.chat-open .topbar{display:none}
+}
 </style>
 </head>
 <body>
@@ -143,94 +232,157 @@ textarea.field-input{resize:none;height:80px;line-height:1.5}
 <div id="login">
   <div class="login-card">
     <div class="lc-brand">
-      <div class="lc-dot">🎾</div>
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="#fff" stroke-width="1.8"/><path d="M12 3v18M3 12h18" stroke="#fff" stroke-width="1.8"/></svg>
+      </div>
       <div>
         <div class="lc-name">Urban Pádel Life</div>
         <div class="lc-sub">Las Rosas · Guadalajara</div>
       </div>
     </div>
     <div class="lc-title">Bienvenido</div>
-    <input class="lc-field" id="lemail" type="email" placeholder="Correo electrónico" />
-    <input class="lc-field" id="lpass" type="password" placeholder="Contraseña"
+    <div class="lc-hint">Entra con tu correo del club para ver las conversaciones.</div>
+    <input class="lc-field" id="lemail" type="email" placeholder="Correo electrónico" autocomplete="username" />
+    <input class="lc-field" id="lpass" type="password" placeholder="Contraseña" autocomplete="current-password"
       onkeydown="if(event.key==='Enter')doLogin()" />
     <button class="lc-btn" onclick="doLogin()">Entrar</button>
-    <div class="lc-err" id="lerr">Credenciales incorrectas</div>
+    <div class="lc-err" id="lerr">Correo o contraseña incorrectos</div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app">
   <div class="topbar">
-    <div class="topbar-dot"></div>
-    <div class="topbar-logo">Urban Pádel</div>
-    <div class="topbar-agent" id="agent-label"></div>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="#fff" stroke-width="1.8"/><path d="M12 3v18M3 12h18" stroke="#fff" stroke-width="1.8"/></svg>
+    </div>
+    <div>
+      <div class="topbar-name">Urban Pádel</div>
+      <div class="topbar-sub">Panel de conversaciones</div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-agent"><span class="agent-dot"></span><span id="agent-label"></span></div>
+      <button class="icon-btn" onclick="logout()" title="Cerrar sesión">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
   </div>
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('chats',this)">💬 Chats</div>
-    <div class="tab" onclick="switchTab('contacts',this)">👥 Contactos</div>
-  </div>
-  <div class="panel">
 
-    <!-- CHATS VIEW -->
-    <div class="view active" id="view-chats">
-      <div class="conv-filters" id="label-filters">
-        <div class="filter-chip active" data-label="" onclick="setFilter('',this)">Todos</div>
+  <div class="workspace">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+      <div class="side-tabs">
+        <div class="side-tab active" id="tab-chats" onclick="switchTab('chats')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Chats
+        </div>
+        <div class="side-tab" id="tab-contacts" onclick="switchTab('contacts')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Contactos
+        </div>
       </div>
-      <div id="conv-list"></div>
 
-      <!-- CHAT OVERLAY -->
-      <div class="chat-wrap" id="chat-wrap">
+      <!-- CHATS LIST -->
+      <div id="view-chats" style="display:flex;flex-direction:column;flex:1;min-height:0">
+        <div class="side-search">
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <input class="search-input" id="search-input" placeholder="Buscar por nombre o número" oninput="loadConvs()" />
+          </div>
+        </div>
+        <div class="conv-filters" id="label-filters">
+          <div class="filter-chip active" data-label="" onclick="setFilter('',this)">Todos</div>
+        </div>
+        <div class="list-scroll" id="conv-list"></div>
+      </div>
+
+      <!-- CONTACTS LIST -->
+      <div id="view-contacts" style="display:none;flex-direction:column;flex:1;min-height:0">
+        <div class="list-scroll" id="contacts-list"></div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="chat-pane" id="chat-pane">
+      <div class="chat-placeholder" id="chat-empty">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="chat-placeholder-text">Selecciona una conversación para ver los mensajes</div>
+      </div>
+
+      <div id="chat-active" style="display:none;flex-direction:column;height:100%">
         <div class="chat-head">
-          <button class="back-btn" onclick="closeChat()">‹</button>
+          <button class="back-btn" onclick="closeChat()">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="avatar" id="ch-avatar">—</div>
           <div class="chat-head-info">
             <div class="chat-head-name" id="ch-name">—</div>
-            <div class="chat-head-status" id="ch-status"></div>
+            <div class="chat-head-status"><span class="dot" id="ch-dot"></span><span id="ch-status-text"></span></div>
           </div>
-          <button class="ctrl-btn take" id="ctrl-btn" onclick="toggleControl()"></button>
-          <button class="info-btn" onclick="openInfoSheet()">⋯</button>
+          <button class="ctrl-switch" id="ctrl-btn" onclick="toggleControl()" title="Cambiar quién atiende">
+            <span class="ctrl-label l">Bot</span>
+            <span class="ctrl-label r">Tú</span>
+            <span class="ctrl-knob" id="ctrl-knob"></span>
+          </button>
+          <button class="info-btn" onclick="openInfoSheet()" title="Ver contacto">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 16v-4M12 8h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
         </div>
         <div class="chat-msgs" id="chat-msgs"></div>
         <div class="chat-footer">
-          <div class="bot-notice" id="bot-notice">El bot está activo. Toma el control para escribir.</div>
-          <div class="input-row" id="input-row" style="display:none">
+          <div class="bot-notice" id="bot-notice">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M12 10V6M9 6h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="9" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/></svg>
+            El bot está atendiendo. Toma el control para escribir tú.
+          </div>
+          <div class="input-row" id="input-row">
             <textarea class="msg-input" id="msg-input" placeholder="Escribe un mensaje..." rows="1"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
               oninput="autoResize(this)"></textarea>
-            <button class="send-btn" onclick="sendMsg()">➤</button>
+            <button class="send-btn" onclick="sendMsg()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- CONTACTS VIEW -->
-    <div class="view" id="view-contacts">
-      <div class="section-title">Todos los contactos</div>
-      <div id="contacts-list"></div>
+  </div>
+</div>
+
+<!-- CONTACT INFO PANEL -->
+<div class="info-overlay" id="info-overlay" onclick="closeInfoSheet()"></div>
+<div class="info-panel" id="info-panel">
+  <div class="info-head">
+    <div class="info-title">Información del contacto</div>
+    <button class="icon-btn" onclick="closeInfoSheet()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="info-body">
+    <div class="field-group">
+      <div class="field-label">Número</div>
+      <div class="field-static mono" id="si-phone">—</div>
     </div>
-
+    <div class="field-group">
+      <div class="field-label">Nombre</div>
+      <input class="field-input" id="si-name" type="text" placeholder="Nombre del contacto" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Notas internas</div>
+      <textarea class="field-input" id="si-notes" placeholder="Notas visibles solo para el equipo..."></textarea>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Etiquetas</div>
+      <div class="labels-grid" id="si-labels"></div>
+    </div>
+  </div>
+  <div class="info-footer">
+    <button class="save-btn" onclick="saveContact()">Guardar cambios</button>
   </div>
 </div>
 
-<!-- INFO SHEET -->
-<div class="info-sheet" id="info-sheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-title">Información del contacto</div>
-  <div class="field-group">
-    <div class="field-label">Nombre</div>
-    <input class="field-input" id="si-name" type="text" placeholder="Nombre del contacto" />
-  </div>
-  <div class="field-group">
-    <div class="field-label">Notas</div>
-    <textarea class="field-input" id="si-notes" placeholder="Notas internas..."></textarea>
-  </div>
-  <div class="field-group">
-    <div class="field-label">Etiquetas</div>
-    <div class="labels-grid" id="si-labels"></div>
-  </div>
-  <button class="save-btn" onclick="saveContact()">Guardar</button>
-</div>
-<div id="sheet-bg" onclick="closeInfoSheet()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99"></div>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <script>
 let token = localStorage.getItem('up_token')
 let agentName = localStorage.getItem('up_name')
@@ -239,6 +391,7 @@ let currentPhone = null
 let currentHuman = false
 let allLabels = []
 let activeFilter = ''
+let activeTab = 'chats'
 let selectedLabelIds = []
 
 if (token) showApp()
@@ -257,7 +410,7 @@ async function doLogin() {
     localStorage.setItem('up_name', agentName)
     showApp()
   } else {
-    document.getElementById('lerr').style.display = 'block'
+    document.getElementById('lerr').style.display = 'flex'
   }
 }
 
@@ -265,10 +418,16 @@ function showApp() {
   document.getElementById('login').style.display = 'none'
   document.getElementById('app').style.display = 'flex'
   document.getElementById('agent-label').textContent = agentName
-  connectSocket()
   loadLabels()
   loadConvs()
   setInterval(loadConvs, 8000)
+  try { connectSocket() } catch (e) { console.error('[Socket] No se pudo conectar:', e.message) }
+}
+
+function logout() {
+  localStorage.removeItem('up_token')
+  localStorage.removeItem('up_name')
+  location.reload()
 }
 
 function connectSocket() {
@@ -285,6 +444,7 @@ function connectSocket() {
 
 async function loadLabels() {
   allLabels = await api('/dashboard/api/labels')
+  if (!allLabels) return
   const fc = document.getElementById('label-filters')
   allLabels.forEach(l => {
     const el = document.createElement('div')
@@ -306,14 +466,24 @@ function setFilter(label, el) {
 
 async function loadConvs() {
   const url = activeFilter ? `/dashboard/api/conversations?label=${encodeURIComponent(activeFilter)}` : '/dashboard/api/conversations'
-  const convs = await api(url)
+  let convs = await api(url)
+  if (!convs) return
+  const q = document.getElementById('search-input').value.trim().toLowerCase()
+  if (q) convs = convs.filter(c => (c.contact_name||'').toLowerCase().includes(q) || c.phone.includes(q))
   const el = document.getElementById('conv-list')
-  if (!convs.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">💬</div><div>Sin conversaciones</div></div>'; return }
+  if (!convs.length) {
+    el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="1.5"/></svg>
+      <div>Sin conversaciones</div>
+      <div class="empty-sub">Los mensajes que lleguen por WhatsApp van a aparecer aquí.</div>
+    </div>`
+    return
+  }
   el.innerHTML = convs.map(c => {
     const tags = (c.labels||[]).map(l => `<span class="tag" style="background:${l.color}22;color:${l.color}">${l.name}</span>`).join('')
-    const dotColor = c.humanControl ? 'var(--orange)' : 'var(--green)'
+    const dotClass = c.humanControl ? 'human' : 'bot'
     return `<div class="conv-item ${currentPhone===c.phone?'active':''}" onclick="openConv('${c.phone}')">
-      <div class="conv-avatar">👤</div>
+      <div class="avatar">${initials(c.contact_name || c.phone)}</div>
       <div class="conv-body">
         <div class="conv-top">
           <div class="conv-name">${esc(c.contact_name || fmt(c.phone))}</div>
@@ -322,7 +492,7 @@ async function loadConvs() {
         <div class="conv-preview">${esc(c.last_message||'')}</div>
         ${tags ? `<div class="conv-tags">${tags}</div>` : ''}
       </div>
-      <div class="mode-dot" style="background:${dotColor}"></div>
+      <div class="state-dot ${dotClass}"></div>
     </div>`
   }).join('')
 }
@@ -330,33 +500,44 @@ async function loadConvs() {
 async function openConv(phone) {
   currentPhone = phone
   const data = await api(`/dashboard/api/conversations/${phone}`)
+  if (!data) return
   currentHuman = data.humanControl
-  document.getElementById('chat-wrap').classList.add('open')
-  document.getElementById('ch-name').textContent = data.contact?.name || fmt(phone)
+  document.getElementById('chat-empty').style.display = 'none'
+  document.getElementById('chat-active').style.display = 'flex'
+  document.getElementById('chat-pane').classList.add('open')
+  document.getElementById('sidebar').classList.add('hide')
+  document.body.classList.add('chat-open')
+  const name = data.contact?.name || fmt(phone)
+  document.getElementById('ch-name').textContent = name
+  document.getElementById('ch-avatar').textContent = initials(name)
   setControlUI(currentHuman)
   const msgs = document.getElementById('chat-msgs')
-  msgs.innerHTML = (data.messages||[]).map(m => msgHTML(m.role, m.content, m.agent)).join('')
+  msgs.innerHTML = renderMessages(data.messages||[])
   msgs.scrollTop = msgs.scrollHeight
   loadConvs()
 }
 
 function closeChat() {
-  document.getElementById('chat-wrap').classList.remove('open')
+  document.getElementById('sidebar').classList.remove('hide')
+  document.getElementById('chat-pane').classList.remove('open')
+  document.body.classList.remove('chat-open')
   currentPhone = null
 }
 
 function setControlUI(isHuman) {
   currentHuman = isHuman
-  document.getElementById('ch-status').textContent = isHuman ? '🟠 Atendido por agente' : '🟢 Bot activo'
   const btn = document.getElementById('ctrl-btn')
-  btn.textContent = isHuman ? 'Devolver al bot' : 'Tomar control'
-  btn.className = `ctrl-btn ${isHuman ? 'release' : 'take'}`
-  document.getElementById('bot-notice').style.display = isHuman ? 'none' : 'block'
-  document.getElementById('input-row').style.display = isHuman ? 'flex' : 'none'
+  btn.classList.toggle('human', isHuman)
+  document.getElementById('ch-dot').style.background = isHuman ? 'var(--signal)' : 'var(--court)'
+  document.getElementById('ch-status-text').textContent = isHuman ? 'Atendido por agente' : 'Bot activo'
+  document.getElementById('bot-notice').style.display = isHuman ? 'none' : 'flex'
+  document.getElementById('input-row').classList.toggle('show', isHuman)
 }
 
 async function toggleControl() {
-  await api(`/dashboard/api/conversations/${currentPhone}/control`, 'POST', {take: !currentHuman})
+  const next = !currentHuman
+  const r = await api(`/dashboard/api/conversations/${currentPhone}/control`, 'POST', {take: next})
+  if (r) setControlUI(next)
 }
 
 async function sendMsg() {
@@ -374,6 +555,16 @@ function appendMsg(role, content, agent) {
   el.scrollTop = el.scrollHeight
 }
 
+function renderMessages(msgs) {
+  let out = '', lastDay = null
+  for (const m of msgs) {
+    const day = new Date(m.created_at).toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long'})
+    if (day !== lastDay) { out += `<div class="day-sep">${day}</div>`; lastDay = day }
+    out += msgHTML(m.role, m.content, m.agent)
+  }
+  return out
+}
+
 function msgHTML(role, content, agent) {
   const isHuman = agent || (content||'').startsWith('[')
   const cls = role === 'user' ? 'user' : isHuman ? 'human' : 'assistant'
@@ -384,7 +575,9 @@ function msgHTML(role, content, agent) {
 async function openInfoSheet() {
   if (!currentPhone) return
   const data = await api(`/dashboard/api/conversations/${currentPhone}`)
+  if (!data) return
   const contact = data.contact || {}
+  document.getElementById('si-phone').textContent = fmt(currentPhone)
   document.getElementById('si-name').value = contact.name || ''
   document.getElementById('si-notes').value = contact.notes || ''
   selectedLabelIds = (contact.labels||[]).map(l => l.id)
@@ -392,18 +585,17 @@ async function openInfoSheet() {
   grid.innerHTML = allLabels.map(l => {
     const on = selectedLabelIds.includes(l.id)
     return `<div class="label-toggle ${on?'on':''}" data-id="${l.id}"
-      style="background:${on?l.color+'33':'transparent'};border-color:${l.color};color:${l.color}"
+      style="background:${on?l.color:'var(--surface)'};border-color:${l.color}"
       onclick="toggleLabel(this,${l.id},'${l.color}')">${l.name}</div>`
   }).join('')
-  document.getElementById('info-sheet').classList.add('open')
-  document.getElementById('sheet-bg').style.display = 'block'
+  document.getElementById('info-panel').classList.add('open')
+  document.getElementById('info-overlay').classList.add('open')
 }
 
 function toggleLabel(el, id, color) {
   const on = !el.classList.contains('on')
   el.classList.toggle('on', on)
-  el.style.background = on ? color+'33' : 'transparent'
-  el.style.opacity = on ? '1' : '.5'
+  el.style.background = on ? color : 'var(--surface)'
   if (on) selectedLabelIds.push(id)
   else selectedLabelIds = selectedLabelIds.filter(i => i !== id)
 }
@@ -413,25 +605,35 @@ async function saveContact() {
   const notes = document.getElementById('si-notes').value.trim()
   await api(`/dashboard/api/contacts/${currentPhone}`, 'PUT', {name, notes})
   await api(`/dashboard/api/contacts/${currentPhone}/labels`, 'POST', {labelIds: selectedLabelIds})
-  document.getElementById('ch-name').textContent = name || fmt(currentPhone)
+  const displayName = name || fmt(currentPhone)
+  document.getElementById('ch-name').textContent = displayName
+  document.getElementById('ch-avatar').textContent = initials(displayName)
   closeInfoSheet()
   loadConvs()
   showNotif('Guardado', 'Contacto actualizado correctamente')
 }
 
 function closeInfoSheet() {
-  document.getElementById('info-sheet').classList.remove('open')
-  document.getElementById('sheet-bg').style.display = 'none'
+  document.getElementById('info-panel').classList.remove('open')
+  document.getElementById('info-overlay').classList.remove('open')
 }
 
 async function loadContacts() {
   const contacts = await api('/dashboard/api/contacts')
+  if (!contacts) return
   const el = document.getElementById('contacts-list')
-  if (!contacts.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">👥</div><div>Sin contactos guardados</div></div>'; return }
+  if (!contacts.length) {
+    el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.5"/></svg>
+      <div>Sin contactos guardados</div>
+      <div class="empty-sub">Aparecen automáticamente cuando alguien escribe por WhatsApp.</div>
+    </div>`
+    return
+  }
   el.innerHTML = contacts.map(c => {
     const tags = (c.labels||[]).map(l => `<span class="tag" style="background:${l.color}22;color:${l.color}">${l.name}</span>`).join('')
-    return `<div class="contact-item" onclick="openConv('${c.phone}');switchTabByName('chats')">
-      <div class="contact-avatar">👤</div>
+    return `<div class="contact-item" onclick="openConv('${c.phone}');switchTab('chats')">
+      <div class="avatar">${initials(c.name||c.phone)}</div>
       <div>
         <div class="contact-name">${esc(c.name||'Sin nombre')}</div>
         <div class="contact-phone">${fmt(c.phone)}</div>
@@ -441,22 +643,13 @@ async function loadContacts() {
   }).join('')
 }
 
-function switchTab(name, el) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
-  el.classList.add('active')
-  document.getElementById(`view-${name}`).classList.add('active')
+function switchTab(name) {
+  activeTab = name
+  document.getElementById('tab-chats').classList.toggle('active', name==='chats')
+  document.getElementById('tab-contacts').classList.toggle('active', name==='contacts')
+  document.getElementById('view-chats').style.display = name==='chats' ? 'flex' : 'none'
+  document.getElementById('view-contacts').style.display = name==='contacts' ? 'flex' : 'none'
   if (name === 'contacts') loadContacts()
-}
-
-function switchTabByName(name) {
-  const tabs = document.querySelectorAll('.tab')
-  const views = document.querySelectorAll('.view')
-  const idx = name === 'chats' ? 0 : 1
-  tabs.forEach(t => t.classList.remove('active'))
-  views.forEach(v => v.classList.remove('active'))
-  tabs[idx].classList.add('active')
-  document.getElementById(`view-${name}`).classList.add('active')
 }
 
 function autoResize(el) {
@@ -474,17 +667,18 @@ async function api(url, method='GET', body=null) {
   return r.json()
 }
 
-function logout() {
-  localStorage.removeItem('up_token')
-  localStorage.removeItem('up_name')
-  location.reload()
-}
-
 function fmt(phone) {
   if (!phone) return ''
   if (phone.startsWith('52') && phone.length === 12)
     return `+52 ${phone.slice(2,4)} ${phone.slice(4,8)} ${phone.slice(8)}`
   return `+${phone}`
+}
+
+function initials(s) {
+  if (!s) return '?'
+  if (/^\d+$/.test(s)) return s.slice(-2)
+  const parts = s.trim().split(/\s+/)
+  return ((parts[0]?.[0]||'') + (parts[1]?.[0]||'')).toUpperCase() || s[0].toUpperCase()
 }
 
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
