@@ -469,8 +469,15 @@ async function api(url, method='GET', body=null) {
   if (body) { opts.method = method; opts.headers['Content-Type']='application/json'; opts.body = JSON.stringify(body) }
   else opts.method = method
   const r = await fetch(url, opts)
+  if (r.status === 401) { logout(); return null }
   if (!r.ok) return null
   return r.json()
+}
+
+function logout() {
+  localStorage.removeItem('up_token')
+  localStorage.removeItem('up_name')
+  location.reload()
 }
 
 function fmt(phone) {
