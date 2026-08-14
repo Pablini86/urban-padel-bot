@@ -14,8 +14,12 @@ async function safeJson(res) {
   catch { return { error: { message: `Respuesta no válida de Meta (HTTP ${res.status}): ${text.slice(0, 200)}` } } }
 }
 
-function buildComponents({ bodyText, variableExamples, buttons }) {
+function buildComponents({ bodyText, variableExamples, buttons, headerHandle }) {
   const components = []
+
+  if (headerHandle) {
+    components.push({ type: 'HEADER', format: 'IMAGE', example: { header_handle: [headerHandle] } })
+  }
 
   const body = { type: 'BODY', text: bodyText }
   if (variableExamples?.length) {
@@ -33,7 +37,44 @@ function buildComponents({ bodyText, variableExamples, buttons }) {
   return components
 }
 
-export async function submitTemplateToMeta({ name, language, category, bodyText, variableExamples, buttons }) {
+// Sube una imagen de muestra para el header de una plantilla usando la Resumable
+// Upload API de Meta (distinta del endpoint normal de /media para mandar mensajes).
+// Requiere WHATSAPP_APP_ID (el ID de la app de Meta, no el WABA_ID) porque la sesión
+// de subida se crea contra el nodo de la app, no contra la cuenta de WhatsApp.
+export async function uploadTemplateHeaderImage({ buffer, mimeType }) {
+  const appId = process.env.WHATSAPP_APP_ID
+  const token = process.env.WHATSAPP_MGMT_TOKEN
+  if (!appId) throw new Error('Falta WHATSAPP_APP_ID en las variables de entorno (ID de la app de Meta, no el WABA_ID)')
+  if (!token) throw new Error('Falta WHATSAPP_MGMT_TOKEN')
+
+  const sessionRes = await fetch(
+    `${API}/${appId}/uploads?file_length=${buffer.length}&file_type=${encodeURIComponent(mimeType)}&access_token=${encodeURIComponent(token)}`,
+    { method: 'POST' }
+  )
+  const session = await safeJson(sessionRes)
+  if (!sessionRes.ok || !session.id) {
+    const detail = session?.error?.error_user_msg || session?.error?.message || JSON.stringify(session)
+    throw new Error(`No se pudo iniciar la subida de la imagen a Meta: ${detail}`)
+  }
+
+  const uploadRes = await fetch(`${API}/${session.id}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `OAuth ${token}`,
+      'file_offset': '0',
+      'Content-Type': 'application/octet-stream'
+    },
+    body: buffer
+  })
+  const upload = await safeJson(uploadRes)
+  if (!uploadRes.ok || !upload.h) {
+    const detail = upload?.error?.error_user_msg || upload?.error?.message || JSON.stringify(upload)
+    throw new Error(`Meta rechazó la imagen: ${detail}`)
+  }
+  return upload.h
+}
+
+export async function submitTemplateToMeta({ name, language, category, bodyText, variableExamples, buttons, headerHandle }) {
   const wabaId = process.env.WABA_ID
   const token = process.env.WHATSAPP_MGMT_TOKEN
   if (!wabaId || !token) {
@@ -50,7 +91,7 @@ export async function submitTemplateToMeta({ name, language, category, bodyText,
       name,
       language: language || 'es_MX',
       category: category || 'UTILITY',
-      components: buildComponents({ bodyText, variableExamples, buttons })
+      components: buildComponents({ bodyText, variableExamples, buttons, headerHandle })
     })
   })
 

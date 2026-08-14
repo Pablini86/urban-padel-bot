@@ -4,14 +4,15 @@ import { Server } from 'socket.io'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { sendWhatsApp } from '../whatsapp.js'
-import { submitTemplateToMeta, checkTemplateStatus } from '../meta-templates.js'
+import { submitTemplateToMeta, checkTemplateStatus, uploadTemplateHeaderImage } from '../meta-templates.js'
 import {
   initDB, upsertContact, updateContact, getContact, markConversationOpened,
   getAllContacts, getAllLabels, setContactLabels, createLabel,
   saveMessage, getMessages, getRecentConversations,
   createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus,
   createCampaign, getCampaigns, getCampaign, getCampaignContacts, getCampaignStats,
-  addAudienceFromLabel, countLabelAudience
+  addAudienceFromLabel, countLabelAudience,
+  getAutomations, createAutomation, updateAutomation, setAutomationActive, deleteAutomation
 } from '../db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -146,23 +147,53 @@ export async function initDashboard(app, conversations) {
     res.json(await getTemplates())
   }))
 
-  app.post('/dashboard/api/templates', auth, express.json(), ah(async (req, res) => {
-    const { name, bodyPreview, variables, buttons, examples } = req.body
+  // Descarga o decodifica la imagen de header antes de mandarla a Meta. Acepta
+  // una URL externa (headerImageUrl) o un archivo ya convertido a data URI en el
+  // navegador (headerImageBase64) — lo que haya puesto el agente en el formulario.
+  async function resolveHeaderImage({ headerImageUrl, headerImageBase64 }) {
+    if (headerImageBase64) {
+      const match = /^data:(.+?);base64,(.+)$/.exec(headerImageBase64)
+      if (!match) throw new Error('La imagen subida no tiene un formato válido')
+      return { buffer: Buffer.from(match[2], 'base64'), mimeType: match[1], displayUrl: headerImageBase64 }
+    }
+    if (headerImageUrl) {
+      const imgRes = await fetch(headerImageUrl)
+      if (!imgRes.ok) throw new Error(`No se pudo descargar la imagen de la URL (HTTP ${imgRes.status})`)
+      const mimeType = imgRes.headers.get('content-type') || 'image/jpeg'
+      const buffer = Buffer.from(await imgRes.arrayBuffer())
+      return { buffer, mimeType, displayUrl: headerImageUrl }
+    }
+    return null
+  }
+
+  // Límite alto porque headerImageBase64 puede traer una foto completa como data URI.
+  app.post('/dashboard/api/templates', auth, express.json({ limit: '10mb' }), ah(async (req, res) => {
+    const { name, bodyPreview, variables, buttons, examples, headerImageUrl, headerImageBase64 } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Falta el nombre de la plantilla' })
     if (!bodyPreview?.trim()) return res.status(400).json({ error: 'Falta el texto del mensaje' })
     const variableList = (variables || '').split(',').map(v => v.trim()).filter(Boolean)
     const buttonList = (buttons || '').split(',').map(v => v.trim()).filter(Boolean)
     const exampleList = (examples || '').split(',').map(v => v.trim()).filter(Boolean)
 
+    let image = null
+    try {
+      image = await resolveHeaderImage({ headerImageUrl, headerImageBase64 })
+    } catch (err) {
+      return res.status(400).json({ error: err.message })
+    }
+
     const template = await createTemplate({
       name: name.trim(), language: 'es_MX', category: 'UTILITY',
-      bodyPreview: bodyPreview.trim(), variables: variableList, buttons: buttonList
+      bodyPreview: bodyPreview.trim(), variables: variableList, buttons: buttonList,
+      headerImageUrl: image?.displayUrl
     })
 
     try {
+      let headerHandle = null
+      if (image) headerHandle = await uploadTemplateHeaderImage(image)
       const { metaTemplateId, status } = await submitTemplateToMeta({
         name: name.trim(), language: 'es_MX', category: 'UTILITY',
-        bodyText: bodyPreview.trim(), variableExamples: exampleList, buttons: buttonList
+        bodyText: bodyPreview.trim(), variableExamples: exampleList, buttons: buttonList, headerHandle
       })
       await setTemplateSubmitted(template.id, { metaTemplateId, status })
     } catch (err) {
@@ -184,6 +215,42 @@ export async function initDashboard(app, conversations) {
       return res.status(502).json({ error: err.message })
     }
     res.json(await getTemplate(template.id))
+  }))
+
+  // Automatizaciones — reglas de palabra clave que responden solas, antes que Claude
+  app.get('/dashboard/api/automations', auth, ah(async (req, res) => {
+    res.json(await getAutomations())
+  }))
+
+  app.post('/dashboard/api/automations', auth, express.json(), ah(async (req, res) => {
+    const { name, keywords, replyText } = req.body
+    if (!name?.trim()) return res.status(400).json({ error: 'Falta el nombre de la automatización' })
+    const keywordList = (keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean)
+    if (!keywordList.length) return res.status(400).json({ error: 'Falta al menos una palabra clave' })
+    if (!replyText?.trim()) return res.status(400).json({ error: 'Falta el texto de la respuesta' })
+    res.json(await createAutomation({ name: name.trim(), keywords: keywordList, replyText: replyText.trim() }))
+  }))
+
+  app.put('/dashboard/api/automations/:id', auth, express.json(), ah(async (req, res) => {
+    const { name, keywords, replyText } = req.body
+    if (!name?.trim()) return res.status(400).json({ error: 'Falta el nombre de la automatización' })
+    const keywordList = (keywords || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean)
+    if (!keywordList.length) return res.status(400).json({ error: 'Falta al menos una palabra clave' })
+    if (!replyText?.trim()) return res.status(400).json({ error: 'Falta el texto de la respuesta' })
+    const updated = await updateAutomation(req.params.id, { name: name.trim(), keywords: keywordList, replyText: replyText.trim() })
+    if (!updated) return res.status(404).json({ error: 'No existe esa automatización' })
+    res.json(updated)
+  }))
+
+  app.post('/dashboard/api/automations/:id/active', auth, express.json(), ah(async (req, res) => {
+    const updated = await setAutomationActive(req.params.id, !!req.body.active)
+    if (!updated) return res.status(404).json({ error: 'No existe esa automatización' })
+    res.json(updated)
+  }))
+
+  app.delete('/dashboard/api/automations/:id', auth, ah(async (req, res) => {
+    await deleteAutomation(req.params.id)
+    res.json({ ok: true })
   }))
 
   // Campañas

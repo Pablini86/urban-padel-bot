@@ -61,6 +61,7 @@ export async function initDB() {
     ALTER TABLE templates ADD COLUMN IF NOT EXISTS meta_template_id TEXT;
     ALTER TABLE templates ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'no_enviada';
     ALTER TABLE templates ADD COLUMN IF NOT EXISTS approval_error TEXT;
+    ALTER TABLE templates ADD COLUMN IF NOT EXISTS header_image_url TEXT;
 
     CREATE TABLE IF NOT EXISTS campaigns (
       id SERIAL PRIMARY KEY,
@@ -103,6 +104,17 @@ export async function initDB() {
     -- Opt-out global de campañas (no aplica al bot normal de servicio a cliente)
     CREATE TABLE IF NOT EXISTS campaign_optouts (
       phone TEXT PRIMARY KEY,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Respuestas automáticas por palabra clave, corren antes que Claude
+    CREATE TABLE IF NOT EXISTS automations (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      keywords TEXT[] NOT NULL DEFAULT '{}',
+      reply_text TEXT NOT NULL,
+      active BOOLEAN NOT NULL DEFAULT true,
+      times_triggered INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `)
@@ -221,14 +233,15 @@ export async function getMessages(phone, limit = 100) {
 }
 
 // Plantillas de WhatsApp (deben existir ya aprobadas en Meta con este mismo nombre)
-export async function createTemplate({ name, language, category, bodyPreview, variables, buttons }) {
+export async function createTemplate({ name, language, category, bodyPreview, variables, buttons, headerImageUrl }) {
   const r = await pool.query(
-    `INSERT INTO templates (name, language, category, body_preview, variables, buttons)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO templates (name, language, category, body_preview, variables, buttons, header_image_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (name) DO UPDATE SET language=EXCLUDED.language, category=EXCLUDED.category,
-       body_preview=EXCLUDED.body_preview, variables=EXCLUDED.variables, buttons=EXCLUDED.buttons
+       body_preview=EXCLUDED.body_preview, variables=EXCLUDED.variables, buttons=EXCLUDED.buttons,
+       header_image_url=EXCLUDED.header_image_url
      RETURNING *`,
-    [name, language || 'es_MX', category || 'UTILITY', bodyPreview || null, variables || [], buttons || []]
+    [name, language || 'es_MX', category || 'UTILITY', bodyPreview || null, variables || [], buttons || [], headerImageUrl || null]
   )
   return r.rows[0]
 }
@@ -346,6 +359,49 @@ export async function isOptedOut(phone) {
 
 export async function addOptOut(phone) {
   await pool.query(`INSERT INTO campaign_optouts (phone) VALUES ($1) ON CONFLICT DO NOTHING`, [phone])
+}
+
+// Automatizaciones (respuestas automáticas por palabra clave, corren antes que Claude)
+export async function getAutomations() {
+  const r = await pool.query(`SELECT * FROM automations ORDER BY created_at DESC`)
+  return r.rows
+}
+
+export async function getActiveAutomations() {
+  const r = await pool.query(`SELECT * FROM automations WHERE active = true ORDER BY created_at ASC`)
+  return r.rows
+}
+
+export async function createAutomation({ name, keywords, replyText }) {
+  const r = await pool.query(
+    `INSERT INTO automations (name, keywords, reply_text) VALUES ($1, $2, $3) RETURNING *`,
+    [name, keywords || [], replyText]
+  )
+  return r.rows[0]
+}
+
+export async function updateAutomation(id, { name, keywords, replyText }) {
+  const r = await pool.query(
+    `UPDATE automations SET name = $2, keywords = $3, reply_text = $4 WHERE id = $1 RETURNING *`,
+    [id, name, keywords || [], replyText]
+  )
+  return r.rows[0] || null
+}
+
+export async function setAutomationActive(id, active) {
+  const r = await pool.query(
+    `UPDATE automations SET active = $2 WHERE id = $1 RETURNING *`,
+    [id, active]
+  )
+  return r.rows[0] || null
+}
+
+export async function deleteAutomation(id) {
+  await pool.query(`DELETE FROM automations WHERE id = $1`, [id])
+}
+
+export async function incrementAutomationTrigger(id) {
+  await pool.query(`UPDATE automations SET times_triggered = times_triggered + 1 WHERE id = $1`, [id])
 }
 
 export async function getRecentConversations() {

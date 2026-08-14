@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getAvailability } from './playtomic.js'
 import { sendWhatsApp } from './whatsapp.js'
-import { saveMessage, upsertContact, addLabelIfMissing } from './db.js'
+import { saveMessage, upsertContact, addLabelIfMissing, getActiveAutomations, incrementAutomationTrigger } from './db.js'
 import { dashboardIO, humanControl } from './dashboard/server.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -93,6 +93,21 @@ export async function handleIncoming(from, name, userMessage) {
     return
   }
 
+  // Reglas de palabra clave configuradas en el panel — si una coincide, responde
+  // directo con el texto fijo y no llega a gastar una llamada a Claude.
+  try {
+    const matched = await matchAutomation(userMessage)
+    if (matched) {
+      history.push({ role: 'assistant', content: matched.reply_text })
+      await sendWhatsApp(from, matched.reply_text)
+      try { await saveMessage(from, 'assistant', matched.reply_text) } catch (e) {}
+      if (dashboardIO) dashboardIO.emit('new_message', { phone: from, role: 'assistant', content: matched.reply_text })
+      incrementAutomationTrigger(matched.id).catch(() => {})
+      console.log(`[Bot -> ${name}] (automatización "${matched.name}"): ${matched.reply_text}`)
+      return
+    }
+  } catch (e) { console.error('[DB] Error revisando automatizaciones:', e.message) }
+
   // Detectar si pide hablar con una persona y avisar al equipo (etiqueta + notificación al dashboard)
   const wantsHuman = WANTS_HUMAN_RE.test(userMessage)
   if (wantsHuman) {
@@ -147,4 +162,18 @@ INSTRUCCIÓN CRÍTICA SOBRE DISPONIBILIDAD:
   if (dashboardIO) dashboardIO.emit('new_message', { phone: from, role: 'assistant', content: reply })
 
   console.log(`[Bot -> ${name}]: ${reply}`)
+}
+
+// Quita acentos para que "cuánto" y "cuanto" hagan match igual — en WhatsApp la
+// mitad de la gente escribe con acentos y la otra mitad no.
+function normalize(s) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
+
+// Busca la primera automatización activa cuya palabra clave aparezca en el mensaje.
+async function matchAutomation(userMessage) {
+  const rules = await getActiveAutomations()
+  if (!rules.length) return null
+  const text = normalize(userMessage)
+  return rules.find(r => r.keywords.some(k => text.includes(normalize(k)))) || null
 }

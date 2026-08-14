@@ -88,9 +88,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus
 
 /* ---------- SIDEBAR ---------- */
 .sidebar{width:340px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
-.side-tabs{display:flex;gap:4px;padding:12px 12px 0}
-.side-tab{flex:1;padding:9px 0;text-align:center;font-size:12.5px;font-weight:600;color:var(--faint);cursor:pointer;border-radius:var(--r-sm);transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
-.side-tab svg{width:15px;height:15px}
+.side-tabs{display:flex;gap:4px;padding:12px 12px 0;overflow-x:auto}
+.side-tabs::-webkit-scrollbar{display:none}
+.side-tab{flex:0 0 auto;padding:9px 12px;text-align:center;font-size:12.5px;font-weight:600;color:var(--faint);cursor:pointer;border-radius:var(--r-sm);transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.side-tab svg{width:15px;height:15px;flex-shrink:0}
 .side-tab.active{color:var(--ink);background:var(--surface-2)}
 .side-search{padding:12px}
 .search-wrap{position:relative}
@@ -210,6 +211,44 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
 .save-btn{width:100%;padding:12px;background:var(--ink);color:#fff;border:none;border-radius:var(--r-sm);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .15s}
 .save-btn:hover{background:var(--court-deep)}
 
+/* ---------- TEMPLATES GALLERY (horizontal, tipo ManyChat) ---------- */
+.tpl-gallery{display:flex;gap:16px;overflow-x:auto;padding:24px;flex:1;align-content:flex-start}
+.tpl-gallery::-webkit-scrollbar{height:8px}
+.tpl-gallery::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.tpl-card{flex:0 0 220px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-1);display:flex;flex-direction:column}
+.tpl-card-img{width:100%;height:130px;object-fit:cover;background:var(--surface-2);display:block}
+.tpl-card-noimg{width:100%;height:130px;display:flex;align-items:center;justify-content:center;background:var(--surface-2);color:var(--faint)}
+.tpl-card-noimg svg{width:26px;height:26px}
+.tpl-card-body{padding:14px;display:flex;flex-direction:column;gap:8px;flex:1}
+.tpl-card-name{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpl-card-preview{font-size:12px;color:var(--slate);line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.tpl-card-footer{margin-top:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tpl-card-error{font-size:11px;color:var(--danger);line-height:1.4}
+.tpl-new-card{flex:0 0 220px;min-height:230px;border:2px dashed var(--line);border-radius:var(--r-lg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--faint);cursor:pointer;background:transparent;transition:all .15s}
+.tpl-new-card:hover{border-color:var(--court);color:var(--court)}
+.tpl-new-card svg{width:26px;height:26px}
+.img-drop{width:100%;height:120px;border:1.5px dashed var(--line);border-radius:var(--r-sm);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--faint);cursor:pointer;overflow:hidden;position:relative;background:var(--surface-2)}
+.img-drop img{width:100%;height:100%;object-fit:cover}
+.img-drop svg{width:22px;height:22px}
+.img-drop-text{font-size:11.5px}
+.img-drop-preview{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;height:100%}
+
+/* ---------- AUTOMATIONS ---------- */
+.auto-list{padding:24px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1}
+.auto-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:16px;display:flex;align-items:flex-start;gap:14px}
+.auto-switch{position:relative;width:42px;height:24px;border-radius:var(--r-full);border:none;cursor:pointer;flex-shrink:0;background:var(--line);transition:background .2s;margin-top:2px}
+.auto-switch.on{background:var(--court)}
+.auto-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.auto-switch.on .auto-knob{transform:translateX(18px)}
+.auto-card-body{flex:1;min-width:0}
+.auto-card-name{font-size:14px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.auto-card-keywords{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.auto-card-reply{font-size:12.5px;color:var(--slate);line-height:1.5}
+.auto-card-actions{display:flex;gap:8px;flex-shrink:0}
+.auto-row{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line-2);cursor:pointer;transition:background .12s}
+.auto-row:hover{background:var(--surface-2)}
+.auto-row-name{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* ---------- CONTACTS VIEW ---------- */
 .section-title{padding:16px 16px 8px;font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
 .contact-item{padding:12px 16px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:12px;cursor:pointer;transition:background .12s}
@@ -302,6 +341,14 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-7-7 18-2-8-8-2v-1z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Campañas
         </div>
+        <div class="side-tab" id="tab-templates" onclick="switchTab('templates')">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.7"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.7"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Plantillas
+        </div>
+        <div class="side-tab" id="tab-automations" onclick="switchTab('automations')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Reglas
+        </div>
       </div>
 
       <!-- CHATS LIST -->
@@ -334,6 +381,22 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
           <button class="save-btn" style="width:auto;padding:9px 16px;white-space:nowrap" onclick="openCampaignForm()">+ Nueva campaña</button>
         </div>
         <div class="list-scroll" id="campaigns-list"></div>
+      </div>
+
+      <!-- TEMPLATES LIST -->
+      <div id="view-templates" style="display:none;flex-direction:column;flex:1;min-height:0">
+        <div class="side-search" style="display:flex;gap:8px">
+          <button class="save-btn" style="width:auto;padding:9px 16px;white-space:nowrap" onclick="openTemplateForm()">+ Nueva plantilla</button>
+        </div>
+        <div class="list-scroll" id="templates-side-list"></div>
+      </div>
+
+      <!-- AUTOMATIONS LIST -->
+      <div id="view-automations" style="display:none;flex-direction:column;flex:1;min-height:0">
+        <div class="side-search" style="display:flex;gap:8px">
+          <button class="save-btn" style="width:auto;padding:9px 16px;white-space:nowrap" onclick="openAutomationForm()">+ Nueva automatización</button>
+        </div>
+        <div class="list-scroll" id="automations-side-list"></div>
       </div>
     </div>
 
@@ -401,6 +464,16 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
       </div>
     </div>
 
+    <!-- TEMPLATES GALLERY -->
+    <div class="chat-pane" id="templates-pane" style="display:none">
+      <div class="tpl-gallery" id="templates-gallery"></div>
+    </div>
+
+    <!-- AUTOMATIONS -->
+    <div class="chat-pane" id="automations-pane" style="display:none">
+      <div class="auto-list" id="automations-main-list"></div>
+    </div>
+
   </div>
 </div>
 
@@ -460,15 +533,7 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
       <div class="field-label">Plantilla</div>
       <select class="field-input" id="cf-template" onchange="showTemplateStatus()"></select>
       <div id="cf-template-status" style="margin-top:6px"></div>
-      <div class="label-add" style="margin-top:8px;display:inline-block" onclick="toggleNewTemplateForm()">+ Crear y mandar a revisión de Meta</div>
-      <div class="new-label-form" id="new-template-form" style="flex-direction:column;align-items:stretch;gap:8px">
-        <input type="text" class="field-input" id="nt-name" placeholder="Nombre (sin espacios, ej. encuesta_verano_2026)" />
-        <textarea class="field-input" id="nt-preview" placeholder="Texto del mensaje — usa {{1}}, {{2}}... donde vayan las variables" style="height:70px"></textarea>
-        <input type="text" class="field-input" id="nt-variables" placeholder="Nombre de cada variable, en orden (ej. nombre_corto, hijo_corto)" />
-        <input type="text" class="field-input" id="nt-examples" placeholder="Un ejemplo real por variable, en el mismo orden (ej. Dafne, tus hijos)" />
-        <input type="text" class="field-input" id="nt-buttons" placeholder="Botones de respuesta rápida, opcional (ej. 0-6, 7-8, 9-10)" />
-        <button onclick="createTemplateSubmit()">Mandar a revisión de Meta</button>
-      </div>
+      <div class="label-add" style="margin-top:8px;display:inline-block" onclick="goCreateTemplateFromCampaign()">+ Crear plantilla nueva</div>
     </div>
     <div class="field-group">
       <div class="field-label">Audiencia</div>
@@ -478,6 +543,82 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
   </div>
   <div class="info-footer">
     <button class="save-btn" onclick="createCampaignSubmit()">Crear campaña</button>
+  </div>
+</div>
+
+<!-- NUEVA PLANTILLA -->
+<div class="info-overlay" id="template-form-overlay" onclick="closeTemplateForm()"></div>
+<div class="info-panel" id="template-form-panel">
+  <div class="info-head">
+    <div class="info-title">Nueva plantilla</div>
+    <button class="icon-btn" onclick="closeTemplateForm()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="info-body">
+    <div class="field-group">
+      <div class="field-label">Imagen (opcional)</div>
+      <label class="img-drop" id="tf-img-drop">
+        <input type="file" accept="image/*" id="tf-img-file" style="display:none" onchange="onTemplateImageFile(event)" />
+        <div id="tf-img-preview" class="img-drop-preview">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="img-drop-text">Sube una foto para el encabezado</div>
+        </div>
+      </label>
+      <input type="text" class="field-input" id="tf-img-url" placeholder="...o pega la URL de una imagen" style="margin-top:8px" oninput="onTemplateImageUrl()" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Nombre (sin espacios, ej. encuesta_verano_2026)</div>
+      <input type="text" class="field-input" id="nt-name" placeholder="encuesta_verano_2026" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Texto del mensaje</div>
+      <textarea class="field-input" id="nt-preview" placeholder="Usa {{1}}, {{2}}... donde vayan las variables" style="height:70px"></textarea>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Variables (opcional)</div>
+      <input type="text" class="field-input" id="nt-variables" placeholder="Nombre de cada variable, en orden (ej. nombre_corto, hijo_corto)" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Ejemplos (opcional)</div>
+      <input type="text" class="field-input" id="nt-examples" placeholder="Un ejemplo real por variable, en el mismo orden (ej. Dafne, tus hijos)" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Botones de respuesta rápida (opcional)</div>
+      <input type="text" class="field-input" id="nt-buttons" placeholder="Ej. 0-6, 7-8, 9-10" />
+    </div>
+  </div>
+  <div class="info-footer">
+    <button class="save-btn" onclick="createTemplateSubmit()">Mandar a revisión de Meta</button>
+  </div>
+</div>
+
+<!-- NUEVA AUTOMATIZACIÓN -->
+<div class="info-overlay" id="automation-form-overlay" onclick="closeAutomationForm()"></div>
+<div class="info-panel" id="automation-form-panel">
+  <div class="info-head">
+    <div class="info-title" id="af-title">Nueva automatización</div>
+    <button class="icon-btn" onclick="closeAutomationForm()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="info-body">
+    <div class="field-group">
+      <div class="field-label">Nombre de la regla</div>
+      <input type="text" class="field-input" id="af-name" placeholder="Ej. Pregunta por precios de renta" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Palabras o frases clave (separadas por coma)</div>
+      <input type="text" class="field-input" id="af-keywords" placeholder="Ej. precio de renta, cuánto cuesta la cancha" />
+      <div class="field-static" style="margin-top:6px;font-size:12px">Se activa si el mensaje del cliente contiene cualquiera de estas frases.</div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Respuesta automática</div>
+      <textarea class="field-input" id="af-reply" placeholder="Texto exacto que se manda cuando coincide" style="height:100px"></textarea>
+    </div>
+  </div>
+  <div class="info-footer">
+    <button class="save-btn" onclick="submitAutomationForm()">Guardar automatización</button>
   </div>
 </div>
 
@@ -866,7 +1007,6 @@ async function openCampaignForm() {
     (labels || []).map(l => `<option value="${esc(l.name)}">${esc(l.name)}</option>`).join('')
   document.getElementById('cf-audience-count').textContent = ''
   document.getElementById('cf-name').value = ''
-  document.getElementById('new-template-form').classList.remove('open')
   document.getElementById('campaign-form-panel').classList.add('open')
   document.getElementById('campaign-form-overlay').classList.add('open')
 }
@@ -900,6 +1040,8 @@ async function refreshTemplateStatus(id) {
   renderTemplateSelect()
   document.getElementById('cf-template').value = t.id
   showTemplateStatus()
+  renderTemplatesGallery()
+  renderTemplatesSideList()
 }
 
 function closeCampaignForm() {
@@ -907,8 +1049,57 @@ function closeCampaignForm() {
   document.getElementById('campaign-form-overlay').classList.remove('open')
 }
 
-function toggleNewTemplateForm() {
-  document.getElementById('new-template-form').classList.toggle('open')
+let pendingHeaderImageBase64 = null
+
+function goCreateTemplateFromCampaign() {
+  closeCampaignForm()
+  switchTab('templates')
+  openTemplateForm()
+}
+
+function openTemplateForm() {
+  document.getElementById('nt-name').value = ''
+  document.getElementById('nt-variables').value = ''
+  document.getElementById('nt-examples').value = ''
+  document.getElementById('nt-buttons').value = ''
+  document.getElementById('nt-preview').value = ''
+  document.getElementById('tf-img-url').value = ''
+  resetTemplateImagePreview()
+  document.getElementById('template-form-panel').classList.add('open')
+  document.getElementById('template-form-overlay').classList.add('open')
+}
+
+function closeTemplateForm() {
+  document.getElementById('template-form-panel').classList.remove('open')
+  document.getElementById('template-form-overlay').classList.remove('open')
+}
+
+function resetTemplateImagePreview() {
+  pendingHeaderImageBase64 = null
+  document.getElementById('tf-img-file').value = ''
+  document.getElementById('tf-img-preview').innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="img-drop-text">Sube una foto para el encabezado</div>`
+}
+
+function onTemplateImageFile(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    pendingHeaderImageBase64 = reader.result
+    document.getElementById('tf-img-url').value = ''
+    document.getElementById('tf-img-preview').innerHTML = `<img src="${reader.result}" alt="Vista previa" />`
+  }
+  reader.readAsDataURL(file)
+}
+
+function onTemplateImageUrl() {
+  const url = document.getElementById('tf-img-url').value.trim()
+  if (!url) { resetTemplateImagePreview(); return }
+  pendingHeaderImageBase64 = null
+  document.getElementById('tf-img-file').value = ''
+  document.getElementById('tf-img-preview').innerHTML = `<img src="${esc(url)}" alt="Vista previa" />`
 }
 
 async function createTemplateSubmit() {
@@ -920,24 +1111,82 @@ async function createTemplateSubmit() {
     variables: document.getElementById('nt-variables').value,
     examples: document.getElementById('nt-examples').value,
     buttons: document.getElementById('nt-buttons').value,
-    bodyPreview
+    bodyPreview,
+    headerImageBase64: pendingHeaderImageBase64,
+    headerImageUrl: pendingHeaderImageBase64 ? null : document.getElementById('tf-img-url').value.trim()
   })
   if (!template) return
-  document.getElementById('nt-name').value = ''
-  document.getElementById('nt-variables').value = ''
-  document.getElementById('nt-examples').value = ''
-  document.getElementById('nt-buttons').value = ''
-  document.getElementById('nt-preview').value = ''
-  document.getElementById('new-template-form').classList.remove('open')
-  allTemplates = await api('/dashboard/api/templates') || []
-  renderTemplateSelect()
-  document.getElementById('cf-template').value = template.id
-  showTemplateStatus()
+  closeTemplateForm()
+  loadTemplates()
   if (template.approval_status === 'error') {
-    showNotif('No se pudo enviar a Meta', template.approval_error || 'Revisa el mensaje de error abajo', true)
+    showNotif('No se pudo enviar a Meta', template.approval_error || 'Revisa la plantilla en el panel', true)
   } else {
     showNotif('Mandada a revisión de Meta', name)
   }
+}
+
+async function loadTemplates() {
+  allTemplates = await api('/dashboard/api/templates') || []
+  renderTemplatesGallery()
+  renderTemplatesSideList()
+}
+
+function renderTemplatesGallery() {
+  const el = document.getElementById('templates-gallery')
+  if (!el) return
+  const cards = allTemplates.map(t => {
+    const color = TEMPLATE_STATUS_COLOR[t.approval_status] || 'var(--faint)'
+    const label = TEMPLATE_STATUS_LABEL[t.approval_status] || t.approval_status
+    const canRefresh = t.approval_status === 'pendiente' || t.approval_status === 'pending'
+    const img = t.header_image_url
+      ? `<img class="tpl-card-img" src="${esc(t.header_image_url)}" alt="">`
+      : `<div class="tpl-card-noimg"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`
+    return `<div class="tpl-card">
+      ${img}
+      <div class="tpl-card-body">
+        <div class="tpl-card-name">${esc(t.name)}</div>
+        <div class="tpl-card-preview">${esc(t.body_preview || '')}</div>
+        ${t.approval_error ? `<div class="tpl-card-error">${esc(t.approval_error)}</div>` : ''}
+        <div class="tpl-card-footer">
+          <span class="tag" style="background:${color}22;color:${color}">${label}</span>
+          ${canRefresh ? `<span class="label-add" style="font-size:10.5px;padding:3px 9px" onclick="refreshTemplateStatus(${t.id})">Verificar</span>` : ''}
+        </div>
+      </div>
+    </div>`
+  }).join('')
+  const newCard = `<div class="tpl-new-card" onclick="openTemplateForm()">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <div>Nueva plantilla</div>
+  </div>`
+  el.innerHTML = cards + newCard
+}
+
+function renderTemplatesSideList() {
+  const el = document.getElementById('templates-side-list')
+  if (!el) return
+  if (!allTemplates.length) {
+    el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5"/></svg>
+      <div>Sin plantillas todavía</div>
+      <div class="empty-sub">Créala para poder mandar campañas por WhatsApp.</div>
+    </div>`
+    return
+  }
+  el.innerHTML = allTemplates.map(t => {
+    const color = TEMPLATE_STATUS_COLOR[t.approval_status] || 'var(--faint)'
+    const label = TEMPLATE_STATUS_LABEL[t.approval_status] || t.approval_status
+    const avatar = t.header_image_url
+      ? `<img src="${esc(t.header_image_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      : esc(t.name.slice(0,2).toUpperCase())
+    return `<div class="contact-item" onclick="refreshTemplateStatus(${t.id})">
+      <div class="avatar">${avatar}</div>
+      <div style="flex:1;min-width:0">
+        <div class="contact-name">${esc(t.name)}</div>
+        <div class="contact-phone">${esc(t.body_preview || '')}</div>
+      </div>
+      <span class="tag" style="background:${color}22;color:${color}">${label}</span>
+    </div>`
+  }).join('')
 }
 
 async function previewAudience() {
@@ -961,18 +1210,122 @@ async function createCampaignSubmit() {
   showNotif('Campaña creada', name)
 }
 
+let allAutomations = []
+let editingAutomationId = null
+
+async function loadAutomations() {
+  allAutomations = await api('/dashboard/api/automations') || []
+  renderAutomationsMainList()
+  renderAutomationsSideList()
+}
+
+function renderAutomationsMainList() {
+  const el = document.getElementById('automations-main-list')
+  if (!el) return
+  if (!allAutomations.length) {
+    el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.5"/></svg>
+      <div>Sin automatizaciones todavía</div>
+      <div class="empty-sub">Crea una regla para responder solo cuando el cliente escriba ciertas palabras.</div>
+    </div>`
+    return
+  }
+  el.innerHTML = allAutomations.map(a => `
+    <div class="auto-card">
+      <button class="auto-switch ${a.active?'on':''}" onclick="toggleAutomationActive(${a.id}, ${!a.active})" title="${a.active?'Apagar':'Prender'}">
+        <span class="auto-knob"></span>
+      </button>
+      <div class="auto-card-body">
+        <div class="auto-card-name">${esc(a.name)} ${a.active ? '<span class="tag" style="background:var(--court-soft);color:var(--court-deep)">Activa</span>' : '<span class="tag" style="background:var(--surface-2);color:var(--faint)">Apagada</span>'}</div>
+        <div class="auto-card-keywords">${(a.keywords||[]).map(k => `<span class="tag" style="background:var(--info-soft);color:var(--info)">${esc(k)}</span>`).join('')}</div>
+        <div class="auto-card-reply">${esc(a.reply_text)}</div>
+      </div>
+      <div class="auto-card-actions">
+        <button class="icon-btn" onclick="openAutomationForm(${a.id})" title="Editar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" onclick="deleteAutomationConfirm(${a.id})" title="Eliminar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>`).join('')
+}
+
+function renderAutomationsSideList() {
+  const el = document.getElementById('automations-side-list')
+  if (!el) return
+  if (!allAutomations.length) { el.innerHTML = ''; return }
+  el.innerHTML = allAutomations.map(a => `
+    <div class="auto-row" onclick="openAutomationForm(${a.id})">
+      <span class="state-dot" style="background:${a.active?'var(--court)':'var(--faint)'};box-shadow:${a.active?'0 0 0 3px var(--court-soft)':'none'}"></span>
+      <span class="auto-row-name">${esc(a.name)}</span>
+    </div>`).join('')
+}
+
+function openAutomationForm(id) {
+  editingAutomationId = id || null
+  const a = id ? allAutomations.find(x => x.id === id) : null
+  document.getElementById('af-title').textContent = a ? 'Editar automatización' : 'Nueva automatización'
+  document.getElementById('af-name').value = a ? a.name : ''
+  document.getElementById('af-keywords').value = a ? (a.keywords||[]).join(', ') : ''
+  document.getElementById('af-reply').value = a ? a.reply_text : ''
+  document.getElementById('automation-form-panel').classList.add('open')
+  document.getElementById('automation-form-overlay').classList.add('open')
+}
+
+function closeAutomationForm() {
+  document.getElementById('automation-form-panel').classList.remove('open')
+  document.getElementById('automation-form-overlay').classList.remove('open')
+}
+
+async function submitAutomationForm() {
+  const name = document.getElementById('af-name').value.trim()
+  const keywords = document.getElementById('af-keywords').value.trim()
+  const replyText = document.getElementById('af-reply').value.trim()
+  if (!name || !keywords || !replyText) { showNotif('Falta información', 'Completa nombre, palabras clave y respuesta'); return }
+  const body = { name, keywords, replyText }
+  const result = editingAutomationId
+    ? await api(`/dashboard/api/automations/${editingAutomationId}`, 'PUT', body)
+    : await api('/dashboard/api/automations', 'POST', body)
+  if (!result) return
+  closeAutomationForm()
+  loadAutomations()
+  showNotif(editingAutomationId ? 'Automatización actualizada' : 'Automatización creada', name)
+}
+
+async function toggleAutomationActive(id, active) {
+  const r = await api(`/dashboard/api/automations/${id}/active`, 'POST', { active })
+  if (!r) return
+  loadAutomations()
+}
+
+async function deleteAutomationConfirm(id) {
+  const a = allAutomations.find(x => x.id === id)
+  if (!confirm(`¿Eliminar la automatización "${a?.name||''}"?`)) return
+  await api(`/dashboard/api/automations/${id}`, 'DELETE')
+  loadAutomations()
+}
+
 function switchTab(name) {
   activeTab = name
   document.getElementById('tab-chats').classList.toggle('active', name==='chats')
   document.getElementById('tab-contacts').classList.toggle('active', name==='contacts')
   document.getElementById('tab-campaigns').classList.toggle('active', name==='campaigns')
+  document.getElementById('tab-templates').classList.toggle('active', name==='templates')
+  document.getElementById('tab-automations').classList.toggle('active', name==='automations')
   document.getElementById('view-chats').style.display = name==='chats' ? 'flex' : 'none'
   document.getElementById('view-contacts').style.display = name==='contacts' ? 'flex' : 'none'
   document.getElementById('view-campaigns').style.display = name==='campaigns' ? 'flex' : 'none'
-  document.getElementById('chat-pane').style.display = name==='campaigns' ? 'none' : 'flex'
+  document.getElementById('view-templates').style.display = name==='templates' ? 'flex' : 'none'
+  document.getElementById('view-automations').style.display = name==='automations' ? 'flex' : 'none'
+  document.getElementById('chat-pane').style.display = name==='chats' ? 'flex' : 'none'
   document.getElementById('campaign-pane').style.display = name==='campaigns' ? 'flex' : 'none'
+  document.getElementById('templates-pane').style.display = name==='templates' ? 'flex' : 'none'
+  document.getElementById('automations-pane').style.display = name==='automations' ? 'flex' : 'none'
   if (name === 'contacts') loadContacts()
   if (name === 'campaigns') loadCampaigns()
+  if (name === 'templates') loadTemplates()
+  if (name === 'automations') loadAutomations()
 }
 
 function autoResize(el) {
