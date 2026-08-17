@@ -256,11 +256,20 @@ export async function getTemplate(id) {
   return r.rows[0] || null
 }
 
-export async function setTemplateSubmitted(id, { metaTemplateId, status }) {
+export async function setTemplateSubmitted(id, { metaTemplateId, status, category }) {
   await pool.query(
-    `UPDATE templates SET meta_template_id = $2, approval_status = $3, approval_error = NULL WHERE id = $1`,
-    [id, metaTemplateId, status]
+    `UPDATE templates SET meta_template_id = $2, approval_status = $3, approval_error = NULL,
+       category = COALESCE($4, category) WHERE id = $1`,
+    [id, metaTemplateId, status, category || null]
   )
+}
+
+// Falla si ya tiene una campaña creada (la FK a campaigns lo impediría de todos
+// modos, pero así el dashboard muestra un mensaje legible en vez de un 500).
+export async function deleteTemplate(id) {
+  const inUse = await pool.query(`SELECT id FROM campaigns WHERE template_id = $1 LIMIT 1`, [id])
+  if (inUse.rows.length) throw new Error('No se puede borrar: ya tiene una campaña creada con esta plantilla')
+  await pool.query(`DELETE FROM templates WHERE id = $1`, [id])
 }
 
 export async function setTemplateError(id, errorMessage) {

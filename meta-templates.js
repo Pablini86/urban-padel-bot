@@ -100,8 +100,9 @@ export async function submitTemplateToMeta({ name, language, category, bodyText,
     const detail = data?.error?.error_user_msg || data?.error?.message || JSON.stringify(data)
     throw new Error(`Meta rechazó la plantilla: ${detail}`)
   }
-  // Meta responde { id, status: 'PENDING', category }
-  return { metaTemplateId: data.id, status: (data.status || 'PENDING').toLowerCase() }
+  // Meta responde { id, status: 'PENDING', category } — la category que regresa
+  // es la que Meta realmente asignó, que puede no ser la que pedimos.
+  return { metaTemplateId: data.id, status: (data.status || 'PENDING').toLowerCase(), category: data.category || category }
 }
 
 export async function checkTemplateStatus(metaTemplateId) {

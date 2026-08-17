@@ -9,7 +9,7 @@ import {
   initDB, upsertContact, updateContact, getContact, markConversationOpened,
   getAllContacts, getAllLabels, setContactLabels, createLabel,
   saveMessage, getMessages, getRecentConversations,
-  createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus,
+  createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus, deleteTemplate,
   createCampaign, getCampaigns, getCampaign, getCampaignContacts, getCampaignStats,
   addAudienceFromLabel, countLabelAudience,
   getAutomations, createAutomation, updateAutomation, setAutomationActive, deleteAutomation
@@ -166,14 +166,42 @@ export async function initDashboard(app, conversations) {
     return null
   }
 
+  // Meta exige minúsculas, números y guion bajo únicamente — el formulario ya
+  // normaliza el nombre mientras el usuario escribe, esto es la última barrera.
+  const TEMPLATE_NAME_RE = /^[a-z0-9_]+$/
+  const TEMPLATE_CATEGORIES = ['UTILITY', 'MARKETING']
+
+  // Revisa que las variables {{1}}, {{2}}... del texto sean consecutivas desde 1
+  // (Meta rechaza los saltos) y que traigan el mismo número de ejemplos, porque
+  // sin eso Meta también rechaza la plantilla — mejor detectarlo aquí que esperar
+  // el rebote de Meta con un mensaje críptico.
+  function validatePlaceholders(bodyText, exampleList) {
+    const nums = [...bodyText.matchAll(/\{\{(\d+)\}\}/g)].map(m => Number(m[1]))
+    const unique = [...new Set(nums)].sort((a, b) => a - b)
+    if (unique.length && !unique.every((n, i) => n === i + 1)) {
+      return `Las variables del mensaje deben ir en orden desde {{1}} sin saltos (encontré: ${unique.map(n => `{{${n}}}`).join(', ')})`
+    }
+    if (unique.length !== exampleList.length) {
+      return `El mensaje usa ${unique.length} variable(s) pero se dieron ${exampleList.length} ejemplo(s) — deben ser el mismo número`
+    }
+    return null
+  }
+
   // Límite alto porque headerImageBase64 puede traer una foto completa como data URI.
   app.post('/dashboard/api/templates', auth, express.json({ limit: '10mb' }), ah(async (req, res) => {
-    const { name, bodyPreview, variables, buttons, examples, headerImageUrl, headerImageBase64 } = req.body
+    const { name, bodyPreview, variables, buttons, examples, category, headerImageUrl, headerImageBase64 } = req.body
     if (!name?.trim()) return res.status(400).json({ error: 'Falta el nombre de la plantilla' })
+    if (!TEMPLATE_NAME_RE.test(name.trim())) {
+      return res.status(400).json({ error: 'El nombre solo puede tener minúsculas, números y guion bajo (sin espacios ni acentos)' })
+    }
     if (!bodyPreview?.trim()) return res.status(400).json({ error: 'Falta el texto del mensaje' })
-    const variableList = (variables || '').split(',').map(v => v.trim()).filter(Boolean)
-    const buttonList = (buttons || '').split(',').map(v => v.trim()).filter(Boolean)
-    const exampleList = (examples || '').split(',').map(v => v.trim()).filter(Boolean)
+    const variableList = (variables || '').split('|').map(v => v.trim()).filter(Boolean)
+    const buttonList = (buttons || '').split('|').map(v => v.trim()).filter(Boolean)
+    const exampleList = (examples || '').split('|').map(v => v.trim()).filter(Boolean)
+    const templateCategory = TEMPLATE_CATEGORIES.includes(category) ? category : 'UTILITY'
+
+    const placeholderError = validatePlaceholders(bodyPreview.trim(), exampleList)
+    if (placeholderError) return res.status(400).json({ error: placeholderError })
 
     let image = null
     try {
@@ -183,7 +211,7 @@ export async function initDashboard(app, conversations) {
     }
 
     const template = await createTemplate({
-      name: name.trim(), language: 'es_MX', category: 'UTILITY',
+      name: name.trim(), language: 'es_MX', category: templateCategory,
       bodyPreview: bodyPreview.trim(), variables: variableList, buttons: buttonList,
       headerImageUrl: image?.displayUrl
     })
@@ -191,16 +219,29 @@ export async function initDashboard(app, conversations) {
     try {
       let headerHandle = null
       if (image) headerHandle = await uploadTemplateHeaderImage(image)
-      const { metaTemplateId, status } = await submitTemplateToMeta({
-        name: name.trim(), language: 'es_MX', category: 'UTILITY',
+      const { metaTemplateId, status, category: metaCategory } = await submitTemplateToMeta({
+        name: name.trim(), language: 'es_MX', category: templateCategory,
         bodyText: bodyPreview.trim(), variableExamples: exampleList, buttons: buttonList, headerHandle
       })
-      await setTemplateSubmitted(template.id, { metaTemplateId, status })
+      await setTemplateSubmitted(template.id, { metaTemplateId, status, category: metaCategory })
     } catch (err) {
       await setTemplateError(template.id, err.message)
     }
 
     res.json(await getTemplate(template.id))
+  }))
+
+  // Borra una plantilla que nunca se aprobó / falló al mandarse. Si ya tiene una
+  // campaña creada, deleteTemplate() truena con un mensaje legible en vez del 500 genérico.
+  app.delete('/dashboard/api/templates/:id', auth, ah(async (req, res) => {
+    const template = await getTemplate(req.params.id)
+    if (!template) return res.status(404).json({ error: 'No existe esa plantilla' })
+    try {
+      await deleteTemplate(req.params.id)
+    } catch (err) {
+      return res.status(400).json({ error: err.message })
+    }
+    res.json({ ok: true })
   }))
 
   // Vuelve a preguntarle a Meta si ya aprobó/rechazó una plantilla

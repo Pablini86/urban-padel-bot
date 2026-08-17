@@ -568,24 +568,31 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
       <input type="text" class="field-input" id="tf-img-url" placeholder="...o pega la URL de una imagen" style="margin-top:8px" oninput="onTemplateImageUrl()" />
     </div>
     <div class="field-group">
-      <div class="field-label">Nombre (sin espacios, ej. encuesta_verano_2026)</div>
-      <input type="text" class="field-input" id="nt-name" placeholder="encuesta_verano_2026" />
+      <div class="field-label">Nombre (así se manda a Meta)</div>
+      <input type="text" class="field-input" id="nt-name" placeholder="encuesta_verano_2026" oninput="onTemplateNameInput()" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Categoría en Meta</div>
+      <select class="field-input" id="nt-category">
+        <option value="UTILITY">Utilidad — el cliente ya inició el trámite (confirmaciones, recordatorios, avisos)</option>
+        <option value="MARKETING">Mercadeo — tú inicias la conversación (promos, encuestas, campañas)</option>
+      </select>
     </div>
     <div class="field-group">
       <div class="field-label">Texto del mensaje</div>
       <textarea class="field-input" id="nt-preview" placeholder="Usa {{1}}, {{2}}... donde vayan las variables" style="height:70px"></textarea>
     </div>
     <div class="field-group">
-      <div class="field-label">Variables (opcional)</div>
-      <input type="text" class="field-input" id="nt-variables" placeholder="Nombre de cada variable, en orden (ej. nombre_corto, hijo_corto)" />
+      <div class="field-label">Variables (opcional, sepáralas con |)</div>
+      <input type="text" class="field-input" id="nt-variables" placeholder="Nombre de cada variable, en orden (ej. nombre_corto | hijo_corto)" />
     </div>
     <div class="field-group">
-      <div class="field-label">Ejemplos (opcional)</div>
-      <input type="text" class="field-input" id="nt-examples" placeholder="Un ejemplo real por variable, en el mismo orden (ej. Dafne, tus hijos)" />
+      <div class="field-label">Ejemplos (opcional, sepáralos con |)</div>
+      <input type="text" class="field-input" id="nt-examples" placeholder="Un ejemplo real por variable, en el mismo orden (ej. Dafne | tus hijos)" />
     </div>
     <div class="field-group">
-      <div class="field-label">Botones de respuesta rápida (opcional)</div>
-      <input type="text" class="field-input" id="nt-buttons" placeholder="Ej. 0-6, 7-8, 9-10" />
+      <div class="field-label">Botones de respuesta rápida (opcional, sepáralos con |)</div>
+      <input type="text" class="field-input" id="nt-buttons" placeholder="Ej. 0-6 | 7-8 | 9-10" />
     </div>
   </div>
   <div class="info-footer">
@@ -1059,6 +1066,7 @@ function goCreateTemplateFromCampaign() {
 
 function openTemplateForm() {
   document.getElementById('nt-name').value = ''
+  document.getElementById('nt-category').value = 'UTILITY'
   document.getElementById('nt-variables').value = ''
   document.getElementById('nt-examples').value = ''
   document.getElementById('nt-buttons').value = ''
@@ -1067,6 +1075,22 @@ function openTemplateForm() {
   resetTemplateImagePreview()
   document.getElementById('template-form-panel').classList.add('open')
   document.getElementById('template-form-overlay').classList.add('open')
+}
+
+// Meta exige minúsculas, números y guion bajo únicamente — se normaliza en vivo
+// para que lo que el usuario ve en el campo sea exactamente lo que se manda.
+function normalizeTemplateName(raw) {
+  return raw
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function onTemplateNameInput() {
+  const el = document.getElementById('nt-name')
+  const normalized = normalizeTemplateName(el.value)
+  if (normalized !== el.value) el.value = normalized
 }
 
 function closeTemplateForm() {
@@ -1103,13 +1127,28 @@ function onTemplateImageUrl() {
 }
 
 async function createTemplateSubmit() {
-  const name = document.getElementById('nt-name').value.trim()
+  const name = normalizeTemplateName(document.getElementById('nt-name').value.trim())
   const bodyPreview = document.getElementById('nt-preview').value.trim()
   if (!name || !bodyPreview) { showNotif('Falta información', 'Ponle nombre y el texto del mensaje'); return }
+
+  const examplesRaw = document.getElementById('nt-examples').value
+  const exampleList = examplesRaw.split('|').map(v => v.trim()).filter(Boolean)
+  const placeholderNums = [...bodyPreview.matchAll(/\{\{(\d+)\}\}/g)].map(m => Number(m[1]))
+  const uniqueNums = [...new Set(placeholderNums)].sort((a, b) => a - b)
+  if (uniqueNums.length && !uniqueNums.every((n, i) => n === i + 1)) {
+    showNotif('Variables mal numeradas', `Usa {{1}}, {{2}}... sin saltos (encontré ${uniqueNums.map(n => `{{${n}}}`).join(', ')})`, true)
+    return
+  }
+  if (uniqueNums.length !== exampleList.length) {
+    showNotif('Faltan ejemplos', `El mensaje usa ${uniqueNums.length} variable(s) pero diste ${exampleList.length} ejemplo(s)`, true)
+    return
+  }
+
   const template = await api('/dashboard/api/templates', 'POST', {
     name,
+    category: document.getElementById('nt-category').value,
     variables: document.getElementById('nt-variables').value,
-    examples: document.getElementById('nt-examples').value,
+    examples: examplesRaw,
     buttons: document.getElementById('nt-buttons').value,
     bodyPreview,
     headerImageBase64: pendingHeaderImageBase64,
@@ -1123,6 +1162,16 @@ async function createTemplateSubmit() {
   } else {
     showNotif('Mandada a revisión de Meta', name)
   }
+}
+
+async function deleteTemplateConfirm(id) {
+  const t = allTemplates.find(x => x.id === id)
+  if (!confirm(`¿Borrar la plantilla "${t?.name || ''}"? Esto no se puede deshacer.`)) return
+  const r = await fetch(`/dashboard/api/templates/${id}`, { method: 'DELETE', headers: { 'x-token': token } })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) { showNotif('No se pudo borrar', data.error || 'Intenta de nuevo', true); return }
+  showNotif('Plantilla borrada', t?.name || '')
+  loadTemplates()
 }
 
 async function loadTemplates() {
@@ -1149,7 +1198,9 @@ function renderTemplatesGallery() {
         ${t.approval_error ? `<div class="tpl-card-error">${esc(t.approval_error)}</div>` : ''}
         <div class="tpl-card-footer">
           <span class="tag" style="background:${color}22;color:${color}">${label}</span>
+          <span class="tag" style="background:var(--faint)22;color:var(--faint)">${esc(t.category || 'UTILITY')}</span>
           ${canRefresh ? `<span class="label-add" style="font-size:10.5px;padding:3px 9px" onclick="refreshTemplateStatus(${t.id})">Verificar</span>` : ''}
+          <span class="label-add" style="font-size:10.5px;padding:3px 9px;color:var(--danger);border-color:var(--danger)" onclick="event.stopPropagation();deleteTemplateConfirm(${t.id})">Borrar</span>
         </div>
       </div>
     </div>`
@@ -1175,10 +1226,11 @@ function renderTemplatesSideList() {
   el.innerHTML = allTemplates.map(t => {
     const color = TEMPLATE_STATUS_COLOR[t.approval_status] || 'var(--faint)'
     const label = TEMPLATE_STATUS_LABEL[t.approval_status] || t.approval_status
+    const canRefresh = t.approval_status === 'pendiente' || t.approval_status === 'pending'
     const avatar = t.header_image_url
       ? `<img src="${esc(t.header_image_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
       : esc(t.name.slice(0,2).toUpperCase())
-    return `<div class="contact-item" onclick="refreshTemplateStatus(${t.id})">
+    return `<div class="contact-item" ${canRefresh ? `onclick="refreshTemplateStatus(${t.id})" style="cursor:pointer"` : 'style="cursor:default"'}>
       <div class="avatar">${avatar}</div>
       <div style="flex:1;min-width:0">
         <div class="contact-name">${esc(t.name)}</div>
