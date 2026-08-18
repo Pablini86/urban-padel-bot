@@ -5,9 +5,11 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { sendWhatsApp } from '../whatsapp.js'
 import { submitTemplateToMeta, checkTemplateStatus, uploadTemplateHeaderImage } from '../meta-templates.js'
+import { parseCsv } from '../csv.js'
+import { normalizeMxPhone } from '../phone.js'
 import {
   initDB, upsertContact, updateContact, getContact, markConversationOpened,
-  getAllContacts, getAllLabels, setContactLabels, createLabel,
+  getAllContacts, getAllLabels, setContactLabels, createLabel, importContacts,
   saveMessage, getMessages, getRecentConversations,
   createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus, deleteTemplate,
   createCampaign, getCampaigns, getCampaign, getCampaignContacts, getCampaignStats,
@@ -128,6 +130,40 @@ export async function initDashboard(app, conversations) {
   app.post('/dashboard/api/contacts/:phone/labels', auth, express.json(), ah(async (req, res) => {
     await setContactLabels(req.params.phone, req.body.labelIds)
     res.json({ ok: true })
+  }))
+
+  // Importa contactos desde un CSV (ej. base de una campaña), les pone una etiqueta
+  // para poder segmentarlos después, y opcionalmente los marca como opt-in. Necesita
+  // una columna de teléfono; el resto de las columnas quedan como variables para
+  // personalizar plantillas (ver addAudienceFromLabel en db.js).
+  app.post('/dashboard/api/contacts/import', auth, express.json({ limit: '2mb' }), ah(async (req, res) => {
+    const { csv, labelName, labelColor, confirmOptIn } = req.body
+    if (!csv?.trim()) return res.status(400).json({ error: 'Falta el archivo CSV' })
+    if (!labelName?.trim()) return res.status(400).json({ error: 'Falta la etiqueta para segmentar estos contactos' })
+
+    const records = parseCsv(csv)
+    if (!records.length) return res.status(400).json({ error: 'El CSV no tiene filas' })
+
+    const headers = Object.keys(records[0])
+    const phoneKey = headers.find(h => /^(telefono|tel[eé]fono|phone|celular)$/i.test(h))
+    if (!phoneKey) return res.status(400).json({ error: 'El CSV necesita una columna de teléfono (telefono o phone)' })
+    const nameKey = headers.find(h => /^(nombre_corto|nombre|name)$/i.test(h))
+
+    const rows = records.map(r => {
+      const vars = {}
+      for (const h of headers) {
+        if (h === phoneKey || h === nameKey) continue
+        if (r[h]) vars[h] = r[h]
+      }
+      return { phone: normalizeMxPhone(r[phoneKey]), name: nameKey ? r[nameKey] : null, vars }
+    }).filter(r => r.phone)
+
+    if (!rows.length) return res.status(400).json({ error: 'Ninguna fila tuvo un teléfono válido' })
+
+    const { imported, label } = await importContacts(rows, {
+      labelName: labelName.trim(), labelColor, markOptedIn: !!confirmOptIn
+    })
+    res.json({ imported, total: records.length, label })
   }))
 
   // Etiquetas

@@ -2,3 +2,7 @@ node_modules/
 .env
 .DS_Store
 npm-debug.log*
+
+# Listas de contactos con datos reales de clientes — se importan una vez por el
+# dashboard (quedan en Postgres), nunca deben vivir en el historial de git.
+*.csv

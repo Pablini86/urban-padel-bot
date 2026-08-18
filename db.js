@@ -17,6 +17,13 @@ export async function initDB() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
     ALTER TABLE contacts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'nuevo';
+    -- vars: columnas extra de un CSV importado (ej. hijo_nombre_corto, num_hijos),
+    -- disponibles para personalizar plantillas al mandar una campaña.
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS vars JSONB NOT NULL DEFAULT '{}';
+    -- opted_in_at: candado para poder incluir a alguien en la audiencia de una
+    -- campaña masiva. Se marca solo (NOW()) cuando el contacto escribe primero al
+    -- bot, o a mano al importar un CSV si se confirma que esa lista dio consentimiento.
+    ALTER TABLE contacts ADD COLUMN IF NOT EXISTS opted_in_at TIMESTAMPTZ;
 
     CREATE TABLE IF NOT EXISTS labels (
       id SERIAL PRIMARY KEY,
@@ -140,10 +147,42 @@ export async function initDB() {
 
 // Contactos
 export async function upsertContact(phone, name) {
+  // opted_in_at solo se pone en el INSERT (contacto nuevo) — que alguien escriba
+  // primero al bot ya cuenta como consentimiento para poder contactarlo después.
+  // Si el contacto ya existía, ON CONFLICT no lo toca (nunca se le quita ni se
+  // le vuelve a poner encima).
   await pool.query(`
-    INSERT INTO contacts (phone, name) VALUES ($1, $2)
+    INSERT INTO contacts (phone, name, opted_in_at) VALUES ($1, $2, NOW())
     ON CONFLICT (phone) DO UPDATE SET name = COALESCE(EXCLUDED.name, contacts.name), updated_at = NOW()
   `, [phone, name])
+}
+
+// Importa contactos en lote (ej. desde un CSV), les asigna una etiqueta para poder
+// segmentarlos después al armar una campaña, y opcionalmente los marca como opt-in
+// (si no se confirma, quedan guardados pero addAudienceFromLabel los excluye).
+// `rows` es [{ phone, name, vars }], donde vars son las columnas extra del CSV
+// (ej. hijo_nombre_corto, num_hijos) para usarlas al personalizar plantillas.
+export async function importContacts(rows, { labelName, labelColor, markOptedIn }) {
+  const label = await createLabel(labelName, labelColor || '#5C6670')
+  let imported = 0
+  for (const row of rows) {
+    if (!row.phone) continue
+    await pool.query(`
+      INSERT INTO contacts (phone, name, vars, opted_in_at)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (phone) DO UPDATE SET
+        name = COALESCE(EXCLUDED.name, contacts.name),
+        vars = contacts.vars || EXCLUDED.vars,
+        opted_in_at = COALESCE(contacts.opted_in_at, EXCLUDED.opted_in_at),
+        updated_at = NOW()
+    `, [row.phone, row.name || row.phone, JSON.stringify(row.vars || {}), markOptedIn ? new Date() : null])
+    await pool.query(
+      `INSERT INTO contact_labels (phone, label_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [row.phone, label.id]
+    )
+    imported++
+  }
+  return { imported, label }
 }
 
 export async function updateContact(phone, { name, notes }) {
@@ -335,14 +374,19 @@ export async function getCampaignStats(campaignId) {
 
 // Arma la audiencia de una campaña a partir de una etiqueta existente, respetando opt-outs.
 // Devuelve cuántos contactos se agregaron.
+// Solo entran contactos con opted_in_at (ver upsertContact/importContacts) — es
+// el candado que evita mandar campañas a alguien que nunca dio consentimiento.
+// vars mezcla nombre_corto (del campo name) con las vars extra del contacto
+// (ej. hijo_nombre_corto, num_hijos) para poder personalizar la plantilla.
 export async function addAudienceFromLabel(campaignId, labelName) {
   const r = await pool.query(`
     INSERT INTO campaign_contacts (campaign_id, phone, vars)
-    SELECT $1, c.phone, jsonb_build_object('nombre_corto', c.name)
+    SELECT $1, c.phone, jsonb_build_object('nombre_corto', c.name) || COALESCE(c.vars, '{}'::jsonb)
     FROM contacts c
     JOIN contact_labels cl ON cl.phone = c.phone
     JOIN labels l ON l.id = cl.label_id AND l.name = $2
-    WHERE NOT EXISTS (SELECT 1 FROM campaign_optouts o WHERE o.phone = c.phone)
+    WHERE c.opted_in_at IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM campaign_optouts o WHERE o.phone = c.phone)
     ON CONFLICT (campaign_id, phone) DO NOTHING
     RETURNING id
   `, [campaignId, labelName])
@@ -356,7 +400,8 @@ export async function countLabelAudience(labelName) {
     FROM contacts c
     JOIN contact_labels cl ON cl.phone = c.phone
     JOIN labels l ON l.id = cl.label_id AND l.name = $1
-    WHERE NOT EXISTS (SELECT 1 FROM campaign_optouts o WHERE o.phone = c.phone)
+    WHERE c.opted_in_at IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM campaign_optouts o WHERE o.phone = c.phone)
   `, [labelName])
   return Number(r.rows[0].n)
 }

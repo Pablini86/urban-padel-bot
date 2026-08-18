@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Urban Pádel — Panel</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2218%22%20fill%3D%22%2317824A%22/%3E%3Cpath%20d%3D%22M32%2010v44M10%2032h44%22%20stroke%3D%22%23fff%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
 
@@ -372,6 +373,9 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
 
       <!-- CONTACTS LIST -->
       <div id="view-contacts" style="display:none;flex-direction:column;flex:1;min-height:0">
+        <div class="side-search" style="display:flex;gap:8px">
+          <button class="save-btn" style="width:auto;padding:9px 16px;white-space:nowrap" onclick="openImportForm()">+ Importar</button>
+        </div>
         <div class="list-scroll" id="contacts-list"></div>
       </div>
 
@@ -626,6 +630,42 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
   </div>
   <div class="info-footer">
     <button class="save-btn" onclick="submitAutomationForm()">Guardar automatización</button>
+  </div>
+</div>
+
+<!-- IMPORTAR CONTACTOS -->
+<div class="info-overlay" id="import-form-overlay" onclick="closeImportForm()"></div>
+<div class="info-panel" id="import-form-panel">
+  <div class="info-head">
+    <div class="info-title">Importar contactos</div>
+    <button class="icon-btn" onclick="closeImportForm()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="info-body">
+    <div class="field-group">
+      <div class="field-label">Archivo CSV</div>
+      <input type="file" accept=".csv,text/csv" class="field-input" id="if-file" style="padding:8px" onchange="onImportFileChange(event)" />
+      <div class="field-static" style="margin-top:6px;font-size:12px" id="if-file-info">Necesita una columna de teléfono (telefono o phone). Las demás columnas quedan disponibles como variables para personalizar mensajes.</div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Etiqueta para segmentar este grupo</div>
+      <input type="text" class="field-input" id="if-label" list="if-label-options" placeholder="Ej. Encuesta Verano 2026" />
+      <datalist id="if-label-options"></datalist>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Color (solo aplica si es etiqueta nueva)</div>
+      <input type="color" id="if-color" value="#17824A" style="width:60px;height:36px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:none" />
+    </div>
+    <div class="field-group">
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-size:13px;color:var(--slate)">
+        <input type="checkbox" id="if-optin" style="margin-top:3px" />
+        Confirmo que estos contactos dieron su consentimiento para recibir mensajes por WhatsApp de Urban Pádel Life (si no marcas esto, se guardan pero no se pueden usar en una campaña).
+      </label>
+    </div>
+  </div>
+  <div class="info-footer">
+    <button class="save-btn" onclick="submitImportForm()">Importar</button>
   </div>
 </div>
 
@@ -923,15 +963,67 @@ async function loadContacts() {
   }
   el.innerHTML = contacts.map(c => {
     const tags = (c.labels||[]).map(l => `<span class="tag" style="background:${l.color}22;color:${l.color}">${l.name}</span>`).join('')
+      + (c.opted_in_at ? '' : `<span class="tag" style="background:var(--faint)22;color:var(--faint)">Sin opt-in</span>`)
     return `<div class="contact-item" onclick="openConv('${c.phone}');switchTab('chats')">
       <div class="avatar">${initials(c.name||c.phone)}</div>
       <div>
         <div class="contact-name">${esc(c.name||'Sin nombre')}</div>
         <div class="contact-phone">${fmt(c.phone)}</div>
-        ${tags ? `<div class="conv-tags" style="margin-top:4px">${tags}</div>` : ''}
+        <div class="conv-tags" style="margin-top:4px">${tags}</div>
       </div>
     </div>`
   }).join('')
+}
+
+let pendingImportCsvText = null
+
+function openImportForm() {
+  pendingImportCsvText = null
+  document.getElementById('if-file').value = ''
+  document.getElementById('if-label').value = ''
+  document.getElementById('if-color').value = '#17824A'
+  document.getElementById('if-optin').checked = false
+  document.getElementById('if-file-info').textContent = 'Necesita una columna de teléfono (telefono o phone). Las demás columnas quedan disponibles como variables para personalizar mensajes.'
+  document.getElementById('if-label-options').innerHTML = allLabels.map(l => `<option value="${esc(l.name)}">`).join('')
+  document.getElementById('import-form-panel').classList.add('open')
+  document.getElementById('import-form-overlay').classList.add('open')
+}
+
+function closeImportForm() {
+  document.getElementById('import-form-panel').classList.remove('open')
+  document.getElementById('import-form-overlay').classList.remove('open')
+}
+
+function onImportFileChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    pendingImportCsvText = reader.result
+    const lines = pendingImportCsvText.split(/\r\n|\n/).filter(Boolean)
+    document.getElementById('if-file-info').textContent = `${file.name} — ${Math.max(lines.length - 1, 0)} fila(s) detectadas`
+  }
+  reader.readAsText(file)
+}
+
+async function submitImportForm() {
+  if (!pendingImportCsvText) { showNotif('Falta el archivo', 'Elige un CSV para importar'); return }
+  const labelName = document.getElementById('if-label').value.trim()
+  if (!labelName) { showNotif('Falta la etiqueta', 'Ponle un nombre para poder segmentar este grupo después'); return }
+  const r = await fetch('/dashboard/api/contacts/import', {
+    method: 'POST', headers: { 'x-token': token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      csv: pendingImportCsvText, labelName,
+      labelColor: document.getElementById('if-color').value,
+      confirmOptIn: document.getElementById('if-optin').checked
+    })
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) { showNotif('No se pudo importar', data.error || 'Intenta de nuevo', true); return }
+  closeImportForm()
+  showNotif('Contactos importados', `${data.imported} de ${data.total} filas, etiqueta "${labelName}"`)
+  if (!allLabels.some(l => l.id === data.label.id)) allLabels.push(data.label)
+  loadContacts()
 }
 
 const CAMPAIGN_STATUS_LABEL = { borrador: 'Borrador', enviando: 'Enviando', pausada: 'Pausada', completada: 'Completada' }
