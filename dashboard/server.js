@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server } from 'socket.io'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import { sendWhatsApp } from '../whatsapp.js'
+import { sendWhatsApp, getWhatsAppBusinessInfo } from '../whatsapp.js'
 import { submitTemplateToMeta, checkTemplateStatus, uploadTemplateHeaderImage } from '../meta-templates.js'
 import { parseCsv } from '../csv.js'
 import { normalizeMxPhone } from '../phone.js'
@@ -165,6 +165,27 @@ export async function initDashboard(app, conversations) {
       labelName: labelName.trim(), labelColor, markOptedIn: !!confirmOptIn
     })
     res.json({ imported, total: records.length, label })
+  }))
+
+  // Estado de la conexión de WhatsApp: nombre/número verificados en Meta (vía
+  // Graph API, cacheado) y qué credenciales están configuradas en Railway. Los
+  // valores nunca salen completos del servidor — solo si están configurados y
+  // sus últimos 4 caracteres, para que el equipo pueda confirmar cuál token
+  // está activo sin poder copiarlo desde el dashboard (ver [[urban_padel_bot_context]]).
+  const maskCredential = v => v ? { configured: true, last4: v.slice(-4) } : { configured: false }
+  app.get('/dashboard/api/whatsapp-status', auth, ah(async (req, res) => {
+    const info = await getWhatsAppBusinessInfo().catch(() => null)
+    res.json({
+      businessName: info?.businessName || null,
+      phoneNumber: info?.phoneNumber || null,
+      credentials: {
+        WHATSAPP_TOKEN: maskCredential(process.env.WHATSAPP_TOKEN),
+        PHONE_NUMBER_ID: maskCredential(process.env.PHONE_NUMBER_ID),
+        WABA_ID: maskCredential(process.env.WABA_ID),
+        WHATSAPP_APP_ID: maskCredential(process.env.WHATSAPP_APP_ID),
+        WHATSAPP_MGMT_TOKEN: maskCredential(process.env.WHATSAPP_MGMT_TOKEN),
+      }
+    })
   }))
 
   // Etiquetas

@@ -1,3 +1,21 @@
+let businessInfoCache = null
+let businessInfoCacheAt = 0
+
+// Nombre y número verificados del negocio en Meta — solo cambian si alguien
+// los reconfigura en WhatsApp Manager, así que se cachean 1h para no golpear
+// la Graph API en cada carga del dashboard.
+export async function getWhatsAppBusinessInfo() {
+  if (businessInfoCache && Date.now() - businessInfoCacheAt < 3600_000) return businessInfoCache
+  if (!process.env.PHONE_NUMBER_ID || !process.env.WHATSAPP_TOKEN) return null
+  const url = `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}?fields=display_phone_number,verified_name`
+  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}` } })
+  if (!res.ok) return null
+  const data = await res.json()
+  businessInfoCache = { phoneNumber: data.display_phone_number, businessName: data.verified_name }
+  businessInfoCacheAt = Date.now()
+  return businessInfoCache
+}
+
 export async function sendWhatsApp(to, text) {
   const url = `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/messages`
 

@@ -88,12 +88,18 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus
 .workspace{flex:1;display:flex;overflow:hidden;min-height:0}
 
 /* ---------- SIDEBAR ---------- */
-.sidebar{width:340px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
-.side-tabs{display:flex;gap:4px;padding:12px 12px 0;overflow-x:auto}
-.side-tabs::-webkit-scrollbar{display:none}
-.side-tab{flex:0 0 auto;padding:9px 12px;text-align:center;font-size:12.5px;font-weight:600;color:var(--faint);cursor:pointer;border-radius:var(--r-sm);transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.sidebar{width:340px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;transition:width .2s var(--ease)}
+.sidebar.compact{width:248px}
+.side-tabs{display:flex;flex-direction:column;gap:2px;padding:10px;flex-shrink:0;border-bottom:1px solid var(--line)}
+.side-tab{padding:8px 10px;cursor:pointer;border-radius:var(--r-md);transition:background .15s;display:flex;align-items:center;gap:12px}
+.side-tab:hover{background:var(--surface-2)}
+.side-tab.active{background:var(--court-soft)}
+.side-tab-icon{width:32px;height:32px;border-radius:50%;background:var(--surface-2);color:var(--slate);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,color .15s}
+.side-tab.active .side-tab-icon{background:var(--court);color:#fff}
 .side-tab svg{width:15px;height:15px;flex-shrink:0}
-.side-tab.active{color:var(--ink);background:var(--surface-2)}
+.side-tab-text{min-width:0}
+.side-tab-label{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side-tab-sub{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .side-search{padding:12px}
 .search-wrap{position:relative}
 .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--faint)}
@@ -256,6 +262,8 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
 .home-stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-1)}
 .home-stat-n{font-size:28px;font-weight:600;line-height:1}
 .home-stat-label{font-size:12px;color:var(--slate);margin-top:8px;font-weight:600}
+.home-stat-wa{background:var(--court-soft)}
+.home-stat-wa-name{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--court-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .home-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
 .home-actions .save-btn{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
 .home-actions .save-btn:hover{background:var(--surface-2);border-color:var(--faint)}
@@ -338,38 +346,32 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
   <div class="workspace">
 
     <!-- SIDEBAR -->
-    <div class="sidebar" id="sidebar">
+    <div class="sidebar compact" id="sidebar">
       <div class="side-tabs">
         <div class="side-tab active" id="tab-home" onclick="switchTab('home')">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M3 11.5L12 4l9 7.5M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Home
+          <div class="side-tab-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 11.5L12 4l9 7.5M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="side-tab-text"><div class="side-tab-label">Home</div><div class="side-tab-sub">Resumen del día</div></div>
         </div>
         <div class="side-tab" id="tab-chats" onclick="switchTab('chats')">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Chats
+          <div class="side-tab-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="side-tab-text"><div class="side-tab-label">Chats</div><div class="side-tab-sub">Conversaciones con clientes</div></div>
         </div>
         <div class="side-tab" id="tab-contacts" onclick="switchTab('contacts')">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Contactos
+          <div class="side-tab-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="side-tab-text"><div class="side-tab-label">Contactos</div><div class="side-tab-sub">Base de clientes y padres</div></div>
         </div>
         <div class="side-tab" id="tab-campaigns" onclick="switchTab('campaigns')">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-7-7 18-2-8-8-2v-1z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Campañas
+          <div class="side-tab-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-7-7 18-2-8-8-2v-1z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="side-tab-text"><div class="side-tab-label">Campañas</div><div class="side-tab-sub">Envíos masivos por plantilla</div></div>
         </div>
         <div class="side-tab" id="tab-templates" onclick="switchTab('templates')">
-          <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.7"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.7"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Plantillas
+          <div class="side-tab-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.7"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.7"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="side-tab-text"><div class="side-tab-label">Plantillas</div><div class="side-tab-sub">Mensajes aprobados por Meta</div></div>
         </div>
         <div class="side-tab" id="tab-automations" onclick="switchTab('automations')">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Reglas
+          <div class="side-tab-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="side-tab-text"><div class="side-tab-label">Reglas</div><div class="side-tab-sub">Respuestas automáticas</div></div>
         </div>
-      </div>
-
-      <!-- HOME -->
-      <div id="view-home" style="display:flex;flex-direction:column;flex:1;min-height:0">
-        <div class="section-title">Accesos rápidos</div>
-        <div class="list-scroll" id="home-shortcuts"></div>
       </div>
 
       <!-- CHATS LIST -->
@@ -707,14 +709,6 @@ let activeStatus = ''
 let activeTab = 'home'
 let selectedLabelIds = []
 
-const HOME_SHORTCUTS = [
-  { tab: 'chats', label: 'Chats', sub: 'Conversaciones con clientes', icon: '<path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' },
-  { tab: 'contacts', label: 'Contactos', sub: 'Base de clientes y padres', icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' },
-  { tab: 'campaigns', label: 'Campañas', sub: 'Envíos masivos por plantilla', icon: '<path d="M3 11l18-7-7 18-2-8-8-2v-1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' },
-  { tab: 'templates', label: 'Plantillas', sub: 'Mensajes aprobados por Meta', icon: '<rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' },
-  { tab: 'automations', label: 'Reglas', sub: 'Respuestas automáticas', icon: '<path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' },
-]
-
 if (token) showApp()
 
 async function doLogin() {
@@ -742,7 +736,6 @@ function showApp() {
   loadLabels()
   loadConvs()
   loadHome()
-  renderHomeShortcuts()
   setInterval(loadConvs, 8000)
   try { connectSocket() } catch (e) { console.error('[Socket] No se pudo conectar:', e.message) }
 }
@@ -1502,25 +1495,27 @@ async function deleteAutomationConfirm(id) {
   loadAutomations()
 }
 
-function renderHomeShortcuts() {
-  const el = document.getElementById('home-shortcuts')
-  el.innerHTML = HOME_SHORTCUTS.map(s => `
-    <div class="contact-item" onclick="switchTab('${s.tab}')">
-      <div class="avatar"><svg viewBox="0 0 24 24" fill="none" style="width:17px;height:17px">${s.icon}</svg></div>
-      <div>
-        <div class="contact-name">${s.label}</div>
-        <div class="contact-phone" style="font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0">${s.sub}</div>
-      </div>
-    </div>`).join('')
+const WA_CRED_LABELS = {
+  WHATSAPP_TOKEN: 'Token de WhatsApp',
+  PHONE_NUMBER_ID: 'ID del número',
+  WABA_ID: 'ID de cuenta de negocio (WABA)',
+  WHATSAPP_APP_ID: 'ID de la app de Meta',
+  WHATSAPP_MGMT_TOKEN: 'Token de administración',
+}
+
+function toggleWaDetail() {
+  const el = document.getElementById('wa-detail')
+  el.style.display = el.style.display === 'none' ? 'block' : 'none'
 }
 
 async function loadHome() {
   const el = document.getElementById('home-content')
-  const [convs, contacts, campaigns, automations] = await Promise.all([
+  const [convs, contacts, campaigns, automations, wa] = await Promise.all([
     api('/dashboard/api/conversations'),
     api('/dashboard/api/contacts'),
     api('/dashboard/api/campaigns'),
     api('/dashboard/api/automations'),
+    api('/dashboard/api/whatsapp-status'),
   ])
   if (!convs) return
 
@@ -1542,6 +1537,18 @@ async function loadHome() {
       <div class="home-stat-n mono" style="color:${c.color}">${c.n}</div>
       <div class="home-stat-label">${c.label}</div>
     </div>`).join('')
+    + `<div class="home-stat home-stat-wa" onclick="toggleWaDetail()">
+      <div class="home-stat-wa-name">${esc(wa?.businessName || 'Urban Pádel Life')}</div>
+      <div class="home-stat-label">${wa?.phoneNumber ? esc(wa.phoneNumber) : 'WhatsApp · ver detalle'}</div>
+    </div>`
+
+  const credRowsHTML = wa ? Object.entries(WA_CRED_LABELS).map(([key, label]) => {
+    const cred = wa.credentials?.[key] || { configured: false }
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-2)">
+      <span style="font-size:12.5px;color:var(--ink);font-weight:600">${label}</span>
+      <span class="mono" style="font-size:12px;color:${cred.configured?'var(--court-deep)':'var(--danger)'}">${cred.configured ? '••••' + esc(cred.last4) : 'No configurado'}</span>
+    </div>`
+  }).join('') : ''
 
   const attention = nuevos.slice(0, 6)
   const attentionHTML = attention.length ? attention.map(c => `
@@ -1560,12 +1567,16 @@ async function loadHome() {
       <div style="font-size:13.5px;color:var(--slate);margin-top:4px">Esto es lo que pasa hoy en Urban Pádel.</div>
     </div>
     <div class="home-stats-grid">${cardsHTML}</div>
+    <div id="wa-detail" style="display:none;margin-top:14px;padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)">
+      <div style="font-size:13px;color:var(--slate);line-height:1.55;margin-bottom:16px">Este es el bot de WhatsApp de Urban Pádel Life: responde automáticamente a los clientes usando IA (Claude) y consulta disponibilidad real de cancha en Playtomic. Se conecta con estas credenciales, configuradas en Railway — el token completo nunca se muestra aquí, solo si está configurado y sus últimos 4 caracteres, para confirmar cuál está activo sin poder copiarlo.</div>
+      <div>${credRowsHTML}</div>
+    </div>
     <div style="margin-top:32px">
       <div class="section-title" style="padding-left:0">Necesitan atención</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">${attentionHTML}</div>
     </div>
     <div style="margin-top:32px">
-      <div class="section-title" style="padding-left:0">Accesos rápidos</div>
+      <div class="section-title" style="padding-left:0">Crear nuevo</div>
       <div class="home-actions">
         <button class="save-btn" style="width:auto;padding:10px 16px" onclick="openImportForm()">+ Importar contactos</button>
         <button class="save-btn" style="width:auto;padding:10px 16px" onclick="openCampaignForm()">+ Nueva campaña</button>
@@ -1577,13 +1588,13 @@ async function loadHome() {
 
 function switchTab(name) {
   activeTab = name
+  document.getElementById('sidebar').classList.toggle('compact', name==='home')
   document.getElementById('tab-home').classList.toggle('active', name==='home')
   document.getElementById('tab-chats').classList.toggle('active', name==='chats')
   document.getElementById('tab-contacts').classList.toggle('active', name==='contacts')
   document.getElementById('tab-campaigns').classList.toggle('active', name==='campaigns')
   document.getElementById('tab-templates').classList.toggle('active', name==='templates')
   document.getElementById('tab-automations').classList.toggle('active', name==='automations')
-  document.getElementById('view-home').style.display = name==='home' ? 'flex' : 'none'
   document.getElementById('view-chats').style.display = name==='chats' ? 'flex' : 'none'
   document.getElementById('view-contacts').style.display = name==='contacts' ? 'flex' : 'none'
   document.getElementById('view-campaigns').style.display = name==='campaigns' ? 'flex' : 'none'
