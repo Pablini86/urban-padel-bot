@@ -2,6 +2,8 @@ import express from 'express'
 import { handleIncoming, conversations } from './bot.js'
 import { initDashboard } from './dashboard/server.js'
 import { normalizeMxPhone } from './phone.js'
+import { getActiveSurveyContact } from './db.js'
+import { handleSurveyReply } from './encuesta.js'
 
 // El bot de WhatsApp vive en el mismo proceso que el dashboard: un error suelto
 // en cualquier lado no debe tumbar la línea de atención en vivo.
@@ -28,13 +30,28 @@ app.post('/webhook', async (req, res) => {
   const change = entry?.changes?.[0]
   const value = change?.value
   const message = value?.messages?.[0]
-  if (!message || message.type !== 'text') return
+  if (!message) return
+
+  // Además de texto libre, aceptamos respuestas de botones de las preguntas de
+  // la encuesta (message.type === 'interactive') — sin esto, cualquier click en
+  // un botón de campaña se pierde en silencio.
+  let text = null
+  if (message.type === 'text') text = message.text.body
+  else if (message.type === 'interactive' && message.interactive?.button_reply) text = message.interactive.button_reply.title
+  if (text === null) return
+
   const from = normalizeMxPhone(message.from)
-  const text = message.text.body
   const name = value.contacts?.[0]?.profile?.name || 'Cliente'
   console.log(`[${name}] ${from}: ${text}`)
   try {
-    await handleIncoming(from, name, text)
+    // Si este teléfono está a media encuesta de una campaña, esa conversación la
+    // maneja encuesta.js — nunca la contesta Claude.
+    const surveyContact = await getActiveSurveyContact(from)
+    if (surveyContact) {
+      await handleSurveyReply(surveyContact, from, name, text)
+    } else {
+      await handleIncoming(from, name, text)
+    }
   } catch (err) {
     console.error('Error procesando mensaje:', err)
   }

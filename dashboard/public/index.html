@@ -1028,8 +1028,8 @@ async function submitImportForm() {
 
 const CAMPAIGN_STATUS_LABEL = { borrador: 'Borrador', enviando: 'Enviando', pausada: 'Pausada', completada: 'Completada' }
 const CAMPAIGN_STATUS_COLOR = { borrador: 'var(--faint)', enviando: 'var(--court)', pausada: 'var(--signal)', completada: 'var(--info)' }
-const CONTACT_ESTADO_LABEL = { pendiente: 'Pendiente', enviando: 'Enviando', enviado: 'Enviado', entregado: 'Entregado', leido: 'Leído', respondido: 'Respondió', fallido: 'Falló', opt_out: 'Se dio de baja' }
-const CONTACT_ESTADO_COLOR = { pendiente: 'var(--faint)', enviando: 'var(--info)', enviado: 'var(--court)', entregado: 'var(--court)', leido: 'var(--court-deep)', respondido: 'var(--court-deep)', fallido: 'var(--danger)', opt_out: 'var(--danger)' }
+const CONTACT_ESTADO_LABEL = { pendiente: 'Pendiente', enviando: 'Enviando', enviado: 'Enviado', entregado: 'Entregado', leido: 'Leído', respondido: 'Respondió', en_curso: 'Respondiendo', completado: 'Completó', fallido: 'Falló', opt_out: 'Se dio de baja' }
+const CONTACT_ESTADO_COLOR = { pendiente: 'var(--faint)', enviando: 'var(--info)', enviado: 'var(--court)', entregado: 'var(--court)', leido: 'var(--court-deep)', respondido: 'var(--court-deep)', en_curso: 'var(--signal)', completado: 'var(--court-deep)', fallido: 'var(--danger)', opt_out: 'var(--danger)' }
 
 async function loadCampaigns() {
   const campaigns = await api('/dashboard/api/campaigns')
@@ -1073,15 +1073,28 @@ async function openCampaign(id) {
       <span class="mono" style="font-size:13px">${fmt(cc.phone)}</span>
       <span class="tag" style="background:${CONTACT_ESTADO_COLOR[cc.estado]}22;color:${CONTACT_ESTADO_COLOR[cc.estado]}">${CONTACT_ESTADO_LABEL[cc.estado] || cc.estado}</span>
     </div>`).join('') || ''
+  const sendSection = c.template_approval_status === 'approved'
+    ? `<button class="save-btn" style="width:auto;padding:9px 16px;margin-top:12px" onclick="sendCampaignBatch(${c.id})">Enviar siguiente lote (hasta ${c.daily_cap})</button>`
+    : `<div class="field-static" style="margin-top:12px;color:var(--danger)">La plantilla todavía no está aprobada por Meta (estado: ${TEMPLATE_STATUS_LABEL[c.template_approval_status] || c.template_approval_status || 'sin enviar'}) — no se puede mandar todavía.</div>`
   document.getElementById('campaign-body').innerHTML = `
     <div class="field-label" style="margin-bottom:8px">Resumen</div>
     ${statsHTML}
+    ${sendSection}
     <div class="field-label" style="margin:20px 0 4px">Contactos (${(c.contacts||[]).length})</div>
     ${contactsHTML}
   `
   document.getElementById('campaign-pane').classList.add('open')
   document.getElementById('sidebar').classList.add('hide')
   document.body.classList.add('chat-open')
+}
+
+async function sendCampaignBatch(id) {
+  const r = await fetch(`/dashboard/api/campaigns/${id}/send-batch`, { method: 'POST', headers: { 'x-token': token } })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) { showNotif('No se pudo enviar', data.error || 'Intenta de nuevo', true); return }
+  if (!data.claimed) { showNotif('Nada que mandar', data.message || 'No hay contactos pendientes'); return }
+  showNotif('Lote en camino', `Mandando a ${data.claimed} contacto(s), toma uno o dos minutos`)
+  setTimeout(() => openCampaign(id), 3000)
 }
 
 function closeCampaign() {

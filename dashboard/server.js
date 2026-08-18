@@ -7,13 +7,14 @@ import { sendWhatsApp } from '../whatsapp.js'
 import { submitTemplateToMeta, checkTemplateStatus, uploadTemplateHeaderImage } from '../meta-templates.js'
 import { parseCsv } from '../csv.js'
 import { normalizeMxPhone } from '../phone.js'
+import { sendClaimedBatch } from '../encuesta.js'
 import {
   initDB, upsertContact, updateContact, getContact, markConversationOpened,
   getAllContacts, getAllLabels, setContactLabels, createLabel, importContacts,
   saveMessage, getMessages, getRecentConversations,
   createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus, deleteTemplate,
   createCampaign, getCampaigns, getCampaign, getCampaignContacts, getCampaignStats,
-  addAudienceFromLabel, countLabelAudience,
+  addAudienceFromLabel, countLabelAudience, claimPendingCampaignContacts,
   getAutomations, createAutomation, updateAutomation, setAutomationActive, deleteAutomation
 } from '../db.js'
 
@@ -356,6 +357,25 @@ export async function initDashboard(app, conversations) {
     const { label } = req.query
     if (!label) return res.json({ count: 0 })
     res.json({ count: await countLabelAudience(label) })
+  }))
+
+  // Manda el siguiente lote de la campaña (hasta daily_cap contactos). Reclama
+  // los contactos "pendiente" de forma atómica antes de responder — así, si le
+  // dan doble clic, el segundo clic ya no encuentra nada que reclamar. El envío
+  // real corre en segundo plano (20-25 contactos a 2-3s cada uno tarda minuto y
+  // medio, muy lento para esperar en la misma petición).
+  app.post('/dashboard/api/campaigns/:id/send-batch', auth, ah(async (req, res) => {
+    const campaign = await getCampaign(req.params.id)
+    if (!campaign) return res.status(404).json({ error: 'No existe esa campaña' })
+    if (campaign.template_approval_status !== 'approved') {
+      return res.status(400).json({
+        error: `La plantilla todavía no está aprobada por Meta (estado actual: ${campaign.template_approval_status || 'sin enviar'})`
+      })
+    }
+    const claimed = await claimPendingCampaignContacts(campaign.id, campaign.daily_cap)
+    if (!claimed.length) return res.json({ claimed: 0, message: 'No hay contactos pendientes por mandar' })
+    sendClaimedBatch(claimed, campaign).catch(err => console.error('[Campaña] Error mandando lote:', err))
+    res.json({ claimed: claimed.length })
   }))
 
   app.get('/dashboard', (req, res) => res.sendFile(join(__dirname, 'public', 'index.html')))

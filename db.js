@@ -350,11 +350,75 @@ export async function getCampaigns() {
 
 export async function getCampaign(id) {
   const r = await pool.query(`
-    SELECT c.*, t.name as template_name, t.body_preview, t.variables, t.buttons
+    SELECT c.*, t.name as template_name, t.language as template_language,
+      t.approval_status as template_approval_status, t.body_preview, t.variables,
+      t.buttons, t.header_image_url
     FROM campaigns c LEFT JOIN templates t ON t.id = c.template_id
     WHERE c.id = $1
   `, [id])
   return r.rows[0] || null
+}
+
+// Reclama hasta `limit` contactos "pendiente" de un jalón, marcándolos "enviando"
+// en la misma sentencia — así un doble clic en "Enviar lote" no manda el mismo
+// contacto dos veces (FOR UPDATE SKIP LOCKED evita que dos llamadas simultáneas
+// agarren la misma fila).
+export async function claimPendingCampaignContacts(campaignId, limit) {
+  const r = await pool.query(`
+    UPDATE campaign_contacts SET estado = 'enviando'
+    WHERE id IN (
+      SELECT id FROM campaign_contacts
+      WHERE campaign_id = $1 AND estado = 'pendiente'
+      ORDER BY id LIMIT $2
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING *
+  `, [campaignId, limit])
+  return r.rows
+}
+
+export async function markContactSent(id, wamid) {
+  await pool.query(
+    `UPDATE campaign_contacts SET estado = 'enviado', paso_actual = 'p1_nps', wamid = $2, enviado_at = NOW(), ultimo_evento_at = NOW() WHERE id = $1`,
+    [id, wamid]
+  )
+}
+
+export async function markContactFailed(id) {
+  await pool.query(
+    `UPDATE campaign_contacts SET estado = 'fallido', ultimo_evento_at = NOW() WHERE id = $1`,
+    [id]
+  )
+}
+
+export async function advanceCampaignContact(id, { pasoActual, estado } = {}) {
+  await pool.query(
+    `UPDATE campaign_contacts SET
+       paso_actual = COALESCE($2, paso_actual),
+       estado = COALESCE($3, estado),
+       ultimo_evento_at = NOW()
+     WHERE id = $1`,
+    [id, pasoActual || null, estado || null]
+  )
+}
+
+// El contacto "activo" de una encuesta para un teléfono que escribe — 'enviado'
+// (se le mandó la plantilla, todavía sin contestar) o 'en_curso' (ya contestó al
+// menos una pregunta). Cualquier otro estado (completado, opt_out, fallido,
+// pendiente) significa que ese teléfono no está a media encuesta ahora mismo.
+export async function getActiveSurveyContact(phone) {
+  const r = await pool.query(
+    `SELECT * FROM campaign_contacts WHERE phone = $1 AND estado IN ('enviado', 'en_curso') ORDER BY enviado_at DESC LIMIT 1`,
+    [phone]
+  )
+  return r.rows[0] || null
+}
+
+export async function saveCampaignResponse({ campaignContactId, pregunta, valor, valorNum }) {
+  await pool.query(
+    `INSERT INTO campaign_responses (campaign_contact_id, pregunta, valor, valor_num) VALUES ($1, $2, $3, $4)`,
+    [campaignContactId, pregunta, valor ?? null, valorNum ?? null]
+  )
 }
 
 export async function getCampaignContacts(campaignId) {
