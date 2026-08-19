@@ -6,5 +6,7 @@
 export function normalizeMxPhone(raw) {
   const digits = String(raw || '').replace(/\D/g, '')
   if (digits.length === 12 && digits.startsWith('52')) return '521' + digits.slice(2)
+  // Número local de 10 dígitos (como lo escribiría alguien a mano en un formulario)
+  if (digits.length === 10) return '521' + digits
   return digits
 }

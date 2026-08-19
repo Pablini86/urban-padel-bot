@@ -11,6 +11,7 @@ import { sendClaimedBatch } from '../encuesta.js'
 import {
   initDB, upsertContact, updateContact, getContact, markConversationOpened,
   getAllContacts, getAllLabels, setContactLabels, createLabel, importContacts,
+  createContact, setContactOptIn, deleteContact, getContactCampaigns,
   saveMessage, getMessages, getRecentConversations,
   createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus, deleteTemplate,
   createCampaign, getCampaigns, getCampaign, getCampaignContacts, getCampaignStats,
@@ -130,6 +131,39 @@ export async function initDashboard(app, conversations) {
 
   app.post('/dashboard/api/contacts/:phone/labels', auth, express.json(), ah(async (req, res) => {
     await setContactLabels(req.params.phone, req.body.labelIds)
+    res.json({ ok: true })
+  }))
+
+  // Ficha de un contacto: datos + a qué campañas pertenece y en qué paso va cada
+  // una. Ojo: a propósito NO usa /conversations/:phone (esa marca la conversación
+  // como 'abierto', lo cual está bien al abrir un chat pero no al solo ver la ficha
+  // desde la lista de Contactos).
+  app.get('/dashboard/api/contacts/:phone', auth, ah(async (req, res) => {
+    const contact = await getContact(req.params.phone)
+    if (!contact) return res.status(404).json({ error: 'No existe ese contacto' })
+    const campaigns = await getContactCampaigns(req.params.phone)
+    res.json({ ...contact, campaigns })
+  }))
+
+  // Alta manual de un contacto (ej. para armar una audiencia chica de prueba
+  // antes de mandarle una campaña real a toda la base).
+  app.post('/dashboard/api/contacts', auth, express.json(), ah(async (req, res) => {
+    const { phone, name, optIn, labelIds } = req.body
+    const normalized = normalizeMxPhone(phone)
+    if (normalized.length !== 13) {
+      return res.status(400).json({ error: 'El teléfono debe ser un celular mexicano válido (10 dígitos, ej. 33 1234 5678)' })
+    }
+    const contact = await createContact({ phone: normalized, name, optIn: !!optIn, labelIds })
+    res.json(contact)
+  }))
+
+  app.post('/dashboard/api/contacts/:phone/opt-in', auth, express.json(), ah(async (req, res) => {
+    await setContactOptIn(req.params.phone, !!req.body.optIn)
+    res.json({ ok: true })
+  }))
+
+  app.delete('/dashboard/api/contacts/:phone', auth, ah(async (req, res) => {
+    await deleteContact(req.params.phone)
     res.json({ ok: true })
   }))
 

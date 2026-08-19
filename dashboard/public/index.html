@@ -400,6 +400,7 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
       <!-- CONTACTS LIST -->
       <div id="view-contacts" style="display:none;flex-direction:column;flex:1;min-height:0">
         <div class="side-search" style="display:flex;gap:8px">
+          <button class="save-btn" style="width:auto;padding:9px 16px;white-space:nowrap" onclick="openNewContactForm()">+ Nuevo</button>
           <button class="save-btn" style="width:auto;padding:9px 16px;white-space:nowrap" onclick="openImportForm()">+ Importar</button>
         </div>
         <div class="list-scroll" id="contacts-list"></div>
@@ -544,9 +545,50 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
         <button onclick="createNewLabel()">Crear</button>
       </div>
     </div>
+    <div class="field-group">
+      <div class="field-label">Opt-in (consentimiento para campañas)</div>
+      <div id="si-optin-status" class="field-static" style="margin-bottom:8px"></div>
+      <div id="si-optin-actions"></div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">Campañas</div>
+      <div id="si-campaigns"></div>
+    </div>
+  </div>
+  <div class="info-footer" style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="save-btn" style="flex:1" onclick="saveContact()">Guardar cambios</button>
+    <button class="save-btn" style="flex:1;background:var(--surface-2);color:var(--slate);border:1px solid var(--line)" onclick="goToChatFromSheet()">Ir al chat</button>
+    <button class="save-btn" style="width:100%;background:var(--danger-soft);color:var(--danger)" onclick="deleteContactConfirm()">Eliminar contacto</button>
+  </div>
+</div>
+
+<!-- NUEVO CONTACTO -->
+<div class="info-overlay" id="new-contact-overlay" onclick="closeNewContactForm()"></div>
+<div class="info-panel" id="new-contact-panel">
+  <div class="info-head">
+    <div class="info-title">Nuevo contacto</div>
+    <button class="icon-btn" onclick="closeNewContactForm()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="info-body">
+    <div class="field-group">
+      <div class="field-label">Teléfono</div>
+      <input class="field-input" id="nc-phone" type="text" placeholder="Ej. 33 1234 5678" />
+    </div>
+    <div class="field-group">
+      <div class="field-label">Nombre</div>
+      <input class="field-input" id="nc-name" type="text" placeholder="Nombre del contacto" />
+    </div>
+    <div class="field-group">
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-size:13px;color:var(--slate)">
+        <input type="checkbox" id="nc-optin" style="margin-top:3px" />
+        Confirmo que este contacto dio su consentimiento para recibir mensajes por WhatsApp de Urban Pádel Life (si no marcas esto, se guarda pero no se puede usar en una campaña).
+      </label>
+    </div>
   </div>
   <div class="info-footer">
-    <button class="save-btn" onclick="saveContact()">Guardar cambios</button>
+    <button class="save-btn" onclick="submitNewContact()">Crear contacto</button>
   </div>
 </div>
 
@@ -915,19 +957,76 @@ function msgHTML(role, content, agent) {
   return `<div class="msg ${cls}"><div class="msg-bubble">${esc(content||'')}</div><div class="msg-label">${label}</div></div>`
 }
 
+function openContactSheet(phone) {
+  currentPhone = phone
+  openInfoSheet()
+}
+
 async function openInfoSheet() {
   if (!currentPhone) return
-  const data = await api(`/dashboard/api/conversations/${currentPhone}`)
-  if (!data) return
-  const contact = data.contact || {}
+  // Ojo: usa /contacts/:phone, no /conversations/:phone — esa última marca la
+  // conversación como 'abierto', que no debe pasar solo por ver la ficha.
+  const contact = await api(`/dashboard/api/contacts/${currentPhone}`)
+  if (!contact) return
   document.getElementById('si-phone').textContent = fmt(currentPhone)
   document.getElementById('si-name').value = contact.name || ''
   document.getElementById('si-notes').value = contact.notes || ''
   selectedLabelIds = (contact.labels||[]).map(l => l.id)
   renderLabelGrid()
+  renderOptInSection(contact.opted_in_at)
+  renderContactCampaigns(contact.campaigns || [])
   document.getElementById('new-label-form').classList.remove('open')
   document.getElementById('info-panel').classList.add('open')
   document.getElementById('info-overlay').classList.add('open')
+}
+
+function renderOptInSection(optedInAt) {
+  const status = document.getElementById('si-optin-status')
+  const actions = document.getElementById('si-optin-actions')
+  if (optedInAt) {
+    status.innerHTML = `<span class="tag" style="background:var(--court-soft);color:var(--court-deep)">Con opt-in</span> desde ${new Date(optedInAt).toLocaleDateString('es-MX')}`
+    actions.innerHTML = `<span class="label-add" style="color:var(--danger);border-color:var(--danger)" onclick="toggleOptIn(false)">Quitar opt-in</span>`
+  } else {
+    status.innerHTML = `<span class="tag" style="background:var(--faint)22;color:var(--faint)">Sin opt-in</span> — no se puede incluir en una campaña`
+    actions.innerHTML = `<span class="label-add" style="color:var(--court);border-color:var(--court)" onclick="toggleOptIn(true)">Marcar opt-in</span>`
+  }
+}
+
+function renderContactCampaigns(campaigns) {
+  const el = document.getElementById('si-campaigns')
+  if (!campaigns.length) {
+    el.innerHTML = `<div class="field-static">No pertenece a ninguna campaña todavía.</div>`
+    return
+  }
+  el.innerHTML = campaigns.map(c => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-2)">
+      <span style="font-size:13px;color:var(--ink)">${esc(c.campaign_name)}</span>
+      <span class="tag" style="background:${CONTACT_ESTADO_COLOR[c.estado]}22;color:${CONTACT_ESTADO_COLOR[c.estado]}">${CONTACT_ESTADO_LABEL[c.estado] || c.estado}</span>
+    </div>`).join('')
+}
+
+async function toggleOptIn(optIn) {
+  if (optIn && !confirm('¿Confirmas que este contacto dio su consentimiento para recibir mensajes por WhatsApp de Urban Pádel Life?')) return
+  const r = await api(`/dashboard/api/contacts/${currentPhone}/opt-in`, 'POST', {optIn})
+  if (!r) return
+  renderOptInSection(optIn ? new Date().toISOString() : null)
+  loadContacts()
+}
+
+function goToChatFromSheet() {
+  const phone = currentPhone
+  closeInfoSheet()
+  switchTab('chats')
+  openConv(phone)
+}
+
+async function deleteContactConfirm() {
+  if (!confirm('¿Eliminar este contacto de la lista? El historial de chat y de campañas no se borra — pero si te vuelve a escribir por WhatsApp, se crea de nuevo con opt-in automático.')) return
+  const r = await api(`/dashboard/api/contacts/${currentPhone}`, 'DELETE')
+  if (!r) return
+  closeInfoSheet()
+  loadContacts()
+  showNotif('Contacto eliminado', 'Se quitó de la lista de contactos')
 }
 
 function renderLabelGrid() {
@@ -977,6 +1076,7 @@ async function saveContact() {
   document.getElementById('ch-avatar').textContent = initials(displayName)
   closeInfoSheet()
   loadConvs()
+  loadContacts()
   showNotif('Guardado', 'Contacto actualizado correctamente')
 }
 
@@ -1000,7 +1100,7 @@ async function loadContacts() {
   el.innerHTML = contacts.map(c => {
     const tags = (c.labels||[]).map(l => `<span class="tag" style="background:${l.color}22;color:${l.color}">${l.name}</span>`).join('')
       + (c.opted_in_at ? '' : `<span class="tag" style="background:var(--faint)22;color:var(--faint)">Sin opt-in</span>`)
-    return `<div class="contact-item" onclick="openConv('${c.phone}');switchTab('chats')">
+    return `<div class="contact-item" onclick="openContactSheet('${c.phone}')">
       <div class="avatar">${initials(c.name||c.phone)}</div>
       <div>
         <div class="contact-name">${esc(c.name||'Sin nombre')}</div>
@@ -1009,6 +1109,35 @@ async function loadContacts() {
       </div>
     </div>`
   }).join('')
+}
+
+function openNewContactForm() {
+  document.getElementById('nc-phone').value = ''
+  document.getElementById('nc-name').value = ''
+  document.getElementById('nc-optin').checked = false
+  document.getElementById('new-contact-panel').classList.add('open')
+  document.getElementById('new-contact-overlay').classList.add('open')
+}
+
+function closeNewContactForm() {
+  document.getElementById('new-contact-panel').classList.remove('open')
+  document.getElementById('new-contact-overlay').classList.remove('open')
+}
+
+async function submitNewContact() {
+  const phone = document.getElementById('nc-phone').value.trim()
+  const name = document.getElementById('nc-name').value.trim()
+  const optIn = document.getElementById('nc-optin').checked
+  if (!phone) { showNotif('Falta el teléfono', 'Escribe el número del contacto'); return }
+  const r = await fetch('/dashboard/api/contacts', {
+    method: 'POST', headers: { 'x-token': token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, name, optIn })
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) { showNotif('No se pudo crear', data.error || 'Intenta de nuevo', true); return }
+  closeNewContactForm()
+  loadContacts()
+  showNotif('Contacto creado', name || fmt(data.phone))
 }
 
 let pendingImportCsvText = null

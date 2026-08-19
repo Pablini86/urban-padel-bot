@@ -191,6 +191,47 @@ export async function updateContact(phone, { name, notes }) {
   `, [phone, name, notes])
 }
 
+// Alta manual de un contacto de prueba desde el dashboard (a diferencia de
+// upsertContact, el opt-in aquí es explícito porque nadie escribió primero).
+export async function createContact({ phone, name, optIn, labelIds }) {
+  const r = await pool.query(`
+    INSERT INTO contacts (phone, name, opted_in_at)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (phone) DO UPDATE SET
+      name = COALESCE(EXCLUDED.name, contacts.name),
+      opted_in_at = COALESCE(contacts.opted_in_at, EXCLUDED.opted_in_at),
+      updated_at = NOW()
+    RETURNING *
+  `, [phone, name || null, optIn ? new Date() : null])
+  if (labelIds?.length) await setContactLabels(phone, labelIds)
+  return r.rows[0]
+}
+
+export async function setContactOptIn(phone, optIn) {
+  await pool.query(`
+    UPDATE contacts SET opted_in_at = $2, updated_at = NOW() WHERE phone = $1
+  `, [phone, optIn ? new Date() : null])
+}
+
+// No hay FK de campaign_contacts/messages hacia contacts a propósito: borrar
+// un contacto del roster no debe borrar el historial de campañas ni de chat.
+export async function deleteContact(phone) {
+  await pool.query(`DELETE FROM contacts WHERE phone = $1`, [phone])
+}
+
+// A qué campañas pertenece un contacto y en qué paso va cada una, para mostrarlo
+// en su ficha (ej. confirmar que un contacto de prueba sí quedó en la campaña chica).
+export async function getContactCampaigns(phone) {
+  const r = await pool.query(`
+    SELECT cp.id as campaign_id, cp.name as campaign_name, cc.estado, cc.enviado_at
+    FROM campaign_contacts cc
+    JOIN campaigns cp ON cp.id = cc.campaign_id
+    WHERE cc.phone = $1
+    ORDER BY cc.id DESC
+  `, [phone])
+  return r.rows
+}
+
 // Pasa una conversación de 'nuevo' a 'abierto' la primera vez que el equipo la abre en el panel
 export async function markConversationOpened(phone) {
   await pool.query(`UPDATE contacts SET status = 'abierto' WHERE phone = $1 AND status = 'nuevo'`, [phone])
