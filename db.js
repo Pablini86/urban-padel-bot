@@ -124,6 +124,21 @@ export async function initDB() {
       times_triggered INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+
+    -- Textos y botones editables de las preguntas de encuesta.js (todo lo que
+    -- NO es el primer mensaje — ese vive horneado en la plantilla aprobada de
+    -- Meta y solo se cambia mandando una plantilla nueva a revisión).
+    -- options: [{value,label}] — value es la clave interna que usa la lógica
+    -- de ramas (ej. p4_closing_si/no) y nunca se edita desde el dashboard, solo
+    -- label (el texto que ve el cliente en el botón).
+    CREATE TABLE IF NOT EXISTS survey_steps (
+      step TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      text TEXT NOT NULL,
+      options JSONB NOT NULL DEFAULT '[]',
+      options_locked BOOLEAN NOT NULL DEFAULT false,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `)
 
   // Insertar etiquetas por defecto
@@ -142,7 +157,69 @@ export async function initDB() {
     )
   }
 
+  // Textos por default de la encuesta (ver spec_encuesta_curso_verano.md) — ON
+  // CONFLICT DO NOTHING para que un redeploy nunca pise lo que Pablo ya editó
+  // desde el dashboard.
+  const surveySteps = [
+    { step: 'p1_nps_retry', label: 'NPS — si no entendimos la respuesta', locked: true,
+      text: 'No agarré tu respuesta — del 0 al 10, ¿qué tan probable es que nos recomiendes con otras familias?',
+      options: [{ value: '0-6', label: '0-6' }, { value: '7-8', label: '7-8' }, { value: '9-10', label: '9-10' }] },
+    { step: 'p2_question', label: 'Pregunta 2 — ¿Se reinscribiría?', locked: false,
+      text: '¿Inscribirías a {{hijo}} el próximo verano?',
+      options: [{ value: 'si', label: 'Sí' }, { value: 'aun_no_se', label: 'Aún no sé' }, { value: 'no', label: 'No' }] },
+    { step: 'p2_retry', label: 'Pregunta 2 — si no entendimos la respuesta', locked: false,
+      text: 'No te entendí — ¿inscribirías a {{hijo}} el próximo verano?', options: [] },
+    { step: 'p3_question', label: 'Pregunta 3 — qué mejorar (abierta)', locked: false,
+      text: 'Última: ¿algo que podamos mejorar para la próxima edición?', options: [] },
+    { step: 'p4_question', label: 'Pregunta 4 — ¿le interesa la clínica infantil?', locked: false,
+      text: 'Gracias. Una cosa más: tenemos clínica infantil de pádel todo el año, grupos por edad y con los mismos profes del curso. ¿Te paso info y horarios?',
+      options: [{ value: 'si', label: 'Sí, mándame info' }, { value: 'no', label: 'Ahorita no' }] },
+    { step: 'p4_retry', label: 'Pregunta 4 — si no entendimos la respuesta', locked: false,
+      text: 'No te entendí — ¿te paso info y horarios de la clínica infantil?', options: [] },
+    { step: 'p4_closing_si', label: 'Cierre — si quiere info de la clínica', locked: false,
+      text: 'Perfecto, en breve un profe te contacta para acomodarlo en el grupo de su edad. Cualquier duda, aquí estamos.', options: [] },
+    { step: 'p4_closing_no', label: 'Cierre — si no le interesa por ahora', locked: false,
+      text: 'Gracias por tu tiempo. Si algún día quieres info de la clínica, escríbenos por aquí.', options: [] },
+    { step: 'optout_bye', label: 'Respuesta cuando alguien se da de baja', locked: false,
+      text: 'Listo, no te vamos a volver a escribir para campañas. Si necesitas algo del club, aquí seguimos.', options: [] }
+  ]
+  for (const s of surveySteps) {
+    await pool.query(
+      `INSERT INTO survey_steps (step, label, text, options, options_locked) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (step) DO NOTHING`,
+      [s.step, s.label, s.text, JSON.stringify(s.options), s.locked]
+    )
+  }
+
   console.log('[DB] Inicializada correctamente')
+}
+
+// Encuesta — textos y botones editables (ver comentario de la tabla arriba)
+export async function getSurveySteps() {
+  const r = await pool.query(`SELECT * FROM survey_steps ORDER BY step`)
+  return r.rows
+}
+
+export async function getSurveyStepsMap() {
+  const rows = await getSurveySteps()
+  return Object.fromEntries(rows.map(r => [r.step, r]))
+}
+
+export async function updateSurveyStep(step, { text, options }) {
+  const existing = await pool.query(`SELECT options_locked, options FROM survey_steps WHERE step = $1`, [step])
+  if (!existing.rows[0]) return null
+  // Los `value` internos de las opciones nunca se editan desde el dashboard —
+  // solo su `label` visible — porque de eso depende a qué rama sigue el flujo
+  // (ej. p4_closing_si/no). Si el paso está bloqueado (NPS) o mandan un número
+  // distinto de opciones, se ignora lo que venga y se conserva lo que ya había.
+  let nextOptions = existing.rows[0].options
+  if (!existing.rows[0].options_locked && Array.isArray(options) && options.length === existing.rows[0].options.length) {
+    nextOptions = existing.rows[0].options.map((o, i) => ({ value: o.value, label: String(options[i]?.label || o.label).trim().slice(0, 20) }))
+  }
+  const r = await pool.query(`
+    UPDATE survey_steps SET text = $2, options = $3, updated_at = NOW() WHERE step = $1
+    RETURNING *
+  `, [step, text, JSON.stringify(nextOptions)])
+  return r.rows[0]
 }
 
 // Contactos

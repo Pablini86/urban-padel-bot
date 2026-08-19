@@ -7,13 +7,11 @@
 import { sendWhatsAppTemplate, sendWhatsAppButtons, sendWhatsApp } from './whatsapp.js'
 import {
   getCampaign, markContactSent, markContactFailed, advanceCampaignContact,
-  saveCampaignResponse, addOptOut, saveMessage, upsertContact
+  saveCampaignResponse, addOptOut, saveMessage, upsertContact, getSurveyStepsMap
 } from './db.js'
 import { dashboardIO, humanControl } from './dashboard/server.js'
 
 const OPT_OUT_RE = /\bbaja\b|\bstop\b|no me escriban|dar de baja/i
-const P2_OPTIONS = ['Sí', 'Aún no sé', 'No']
-const P4_OPTIONS = ['Sí, mándame info', 'Ahorita no']
 const NPS_LABEL_TO_NUM = { '0-6': 6, '7-8': 7, '9-10': 9 }
 
 // Se pierde si el proceso se reinicia (Railway redeploy a media encuesta) — no
@@ -35,9 +33,21 @@ function parseNps(text) {
   return Number.isFinite(n) && n >= 0 && n <= 10 ? n : null
 }
 
+// Matchea contra la `label` visible (editable desde el dashboard) y regresa la
+// `value` interna fija — así el texto del botón se puede reescribir sin romper
+// a qué rama sigue el flujo.
 function matchOption(text, options) {
   const t = text.trim().toLowerCase()
-  return options.find(o => o.toLowerCase() === t) || null
+  const found = (options || []).find(o => o.label.toLowerCase() === t)
+  return found ? found.value : null
+}
+
+function toButtons(options) {
+  return (options || []).map(o => ({ id: o.value, title: o.label }))
+}
+
+function renderTemplate(text, vars) {
+  return text.replace(/\{\{(\w+)\}\}/g, (_, k) => (vars?.[k] ?? ''))
 }
 
 // El interceptor del webhook llama esto ANTES de bot.js/Claude — a diferencia de
@@ -82,11 +92,12 @@ export async function sendClaimedBatch(claimed, campaign) {
 // getActiveSurveyContact) indica que este teléfono está a media encuesta.
 export async function handleSurveyReply(contact, phone, name, text) {
   await logInbound(phone, name, text)
+  const steps = await getSurveyStepsMap()
 
   if (OPT_OUT_RE.test(text)) {
     await addOptOut(phone)
     await advanceCampaignContact(contact.id, { estado: 'opt_out' })
-    const bye = 'Listo, no te vamos a volver a escribir para campañas. Si necesitas algo del club, aquí seguimos.'
+    const bye = steps.optout_bye.text
     await sendWhatsApp(phone, bye)
     await logOutbound(phone, bye)
     return
@@ -105,9 +116,9 @@ export async function handleSurveyReply(contact, phone, name, text) {
       const num = parseNps(text)
       if (num === null && !alreadyRetried) {
         retryCount.set(retryKey, 1)
-        const q = 'No agarré tu respuesta — del 0 al 10, ¿qué tan probable es que nos recomiendes con otras familias?'
-        await sendWhatsAppButtons(phone, q, [{ id: '0-6', title: '0-6' }, { id: '7-8', title: '7-8' }, { id: '9-10', title: '9-10' }])
-        await logOutbound(phone, q)
+        const step = steps.p1_nps_retry
+        await sendWhatsAppButtons(phone, step.text, toButtons(step.options))
+        await logOutbound(phone, step.text)
         return
       }
       retryCount.delete(retryKey)
@@ -115,27 +126,29 @@ export async function handleSurveyReply(contact, phone, name, text) {
 
       const hijoCorto = personalizarHijo(contact.vars)
       const intro = num !== null && num >= 9 ? '¡Nos alegra muchísimo! ' : num !== null && num <= 6 ? 'Gracias por la honestidad, nos sirve mucho. ' : ''
-      const q = `${intro}¿Inscribirías a ${hijoCorto} el próximo verano?`
-      await sendWhatsAppButtons(phone, q, [{ id: 'si', title: 'Sí' }, { id: 'aun_no_se', title: 'Aún no sé' }, { id: 'no', title: 'No' }])
+      const step = steps.p2_question
+      const q = intro + renderTemplate(step.text, { hijo: hijoCorto })
+      await sendWhatsAppButtons(phone, q, toButtons(step.options))
       await logOutbound(phone, q)
       await advanceCampaignContact(contact.id, { pasoActual: 'p2_reinscribe', estado: 'en_curso' })
       return
     }
 
     case 'p2_reinscribe': {
-      const match = matchOption(text, P2_OPTIONS)
+      const p2 = steps.p2_question
+      const match = matchOption(text, p2.options)
       if (!match && !alreadyRetried) {
         retryCount.set(retryKey, 1)
         const hijoCorto = personalizarHijo(contact.vars)
-        const q = `No te entendí — ¿inscribirías a ${hijoCorto} el próximo verano?`
-        await sendWhatsAppButtons(phone, q, [{ id: 'si', title: 'Sí' }, { id: 'aun_no_se', title: 'Aún no sé' }, { id: 'no', title: 'No' }])
+        const q = renderTemplate(steps.p2_retry.text, { hijo: hijoCorto })
+        await sendWhatsAppButtons(phone, q, toButtons(p2.options))
         await logOutbound(phone, q)
         return
       }
       retryCount.delete(retryKey)
       await saveCampaignResponse({ campaignContactId: contact.id, pregunta: 'reinscribe', valor: match || 'sin_respuesta' })
 
-      const q = 'Última: ¿algo que podamos mejorar para la próxima edición?'
+      const q = steps.p3_question.text
       await sendWhatsApp(phone, q)
       await logOutbound(phone, q)
       await advanceCampaignContact(contact.id, { pasoActual: 'p3_mejora' })
@@ -146,29 +159,27 @@ export async function handleSurveyReply(contact, phone, name, text) {
       // Pregunta abierta — cualquier texto cuenta como respuesta, no hay reintento.
       await saveCampaignResponse({ campaignContactId: contact.id, pregunta: 'mejora', valor: text })
 
-      const q = 'Gracias. Una cosa más: tenemos clínica infantil de pádel todo el año, grupos por edad y con los mismos profes del curso. ¿Te paso info y horarios?'
-      await sendWhatsAppButtons(phone, q, [{ id: 'clinica_si', title: 'Sí, mándame info' }, { id: 'clinica_no', title: 'Ahorita no' }])
-      await logOutbound(phone, q)
+      const step = steps.p4_question
+      await sendWhatsAppButtons(phone, step.text, toButtons(step.options))
+      await logOutbound(phone, step.text)
       await advanceCampaignContact(contact.id, { pasoActual: 'p4_clinica' })
       return
     }
 
     case 'p4_clinica': {
-      const match = matchOption(text, P4_OPTIONS)
+      const p4 = steps.p4_question
+      const match = matchOption(text, p4.options)
       if (!match && !alreadyRetried) {
         retryCount.set(retryKey, 1)
-        const q = 'No te entendí — ¿te paso info y horarios de la clínica infantil?'
-        await sendWhatsAppButtons(phone, q, [{ id: 'clinica_si', title: 'Sí, mándame info' }, { id: 'clinica_no', title: 'Ahorita no' }])
+        const q = steps.p4_retry.text
+        await sendWhatsAppButtons(phone, q, toButtons(p4.options))
         await logOutbound(phone, q)
         return
       }
       retryCount.delete(retryKey)
       await saveCampaignResponse({ campaignContactId: contact.id, pregunta: 'clinica', valor: match || 'sin_respuesta' })
 
-      const wantsClinic = (match || '').toLowerCase().startsWith('sí')
-      const closing = wantsClinic
-        ? 'Perfecto, en breve un profe te contacta para acomodarlo en el grupo de su edad. Cualquier duda, aquí estamos.'
-        : 'Gracias por tu tiempo. Si algún día quieres info de la clínica, escríbenos por aquí.'
+      const closing = match === 'si' ? steps.p4_closing_si.text : steps.p4_closing_no.text
       await sendWhatsApp(phone, closing)
       await logOutbound(phone, closing)
       await advanceCampaignContact(contact.id, { pasoActual: 'cierre', estado: 'completado' })

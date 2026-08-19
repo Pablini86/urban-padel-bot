@@ -374,6 +374,10 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
         <div class="side-tab-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <div class="side-tab-text"><div class="side-tab-label">Reglas</div><div class="side-tab-sub">Respuestas automáticas</div></div>
       </div>
+      <div class="side-tab" id="tab-survey" onclick="switchTab('survey')">
+        <div class="side-tab-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="side-tab-text"><div class="side-tab-label">Flujo</div><div class="side-tab-sub">Mensajes de la encuesta</div></div>
+      </div>
     </div>
 
     <!-- SIDEBAR -->
@@ -428,6 +432,14 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
           <button class="save-btn" style="width:auto;padding:9px 16px;white-space:nowrap" onclick="openAutomationForm()">+ Nueva automatización</button>
         </div>
         <div class="list-scroll" id="automations-side-list"></div>
+      </div>
+
+      <!-- SURVEY FLOW LIST -->
+      <div id="view-survey" style="display:none;flex-direction:column;flex:1;min-height:0">
+        <div class="side-search">
+          <div class="field-static" style="font-size:12px;padding:2px 4px">El primer mensaje (con la pregunta de NPS) va horneado en la plantilla aprobada — para cambiarlo hay que mandar una plantilla nueva.</div>
+        </div>
+        <div class="list-scroll" id="survey-side-list"></div>
       </div>
     </div>
 
@@ -508,6 +520,11 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
     <!-- AUTOMATIONS -->
     <div class="chat-pane" id="automations-pane" style="display:none">
       <div class="auto-list" id="automations-main-list"></div>
+    </div>
+
+    <!-- SURVEY FLOW -->
+    <div class="chat-pane" id="survey-pane" style="display:none">
+      <div class="auto-list" id="survey-main-list"></div>
     </div>
 
   </div>
@@ -703,6 +720,32 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
   </div>
   <div class="info-footer">
     <button class="save-btn" onclick="submitAutomationForm()">Guardar automatización</button>
+  </div>
+</div>
+
+<!-- EDITAR MENSAJE DE ENCUESTA -->
+<div class="info-overlay" id="survey-form-overlay" onclick="closeSurveyStepForm()"></div>
+<div class="info-panel" id="survey-form-panel">
+  <div class="info-head">
+    <div class="info-title" id="sf-title">Editar mensaje</div>
+    <button class="icon-btn" onclick="closeSurveyStepForm()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="info-body">
+    <div class="field-group">
+      <div class="field-label">Texto del mensaje</div>
+      <textarea class="field-input" id="sf-text" style="height:100px"></textarea>
+      <div class="field-static" id="sf-hijo-hint" style="margin-top:6px;font-size:12px;display:none">Puedes usar <code>{{hijo}}</code> donde quieras que vaya el nombre del hijo (o "tus hijos" si son varios).</div>
+    </div>
+    <div class="field-group" id="sf-options-group" style="display:none">
+      <div class="field-label">Botones</div>
+      <div id="sf-options"></div>
+      <div class="field-static" id="sf-locked-note" style="margin-top:6px;font-size:12px;display:none">Estos botones son fijos — cambiar el texto rompería cómo contamos las respuestas.</div>
+    </div>
+  </div>
+  <div class="info-footer">
+    <button class="save-btn" onclick="submitSurveyStepForm()">Guardar mensaje</button>
   </div>
 </div>
 
@@ -1628,6 +1671,88 @@ async function deleteAutomationConfirm(id) {
   loadAutomations()
 }
 
+// Orden real de la conversación — el orden alfabético del `step` en la BD no
+// sirve para esto (ej. p4_closing_no quedaría antes que p4_question).
+const SURVEY_STEP_ORDER = ['p1_nps_retry', 'p2_question', 'p2_retry', 'p3_question', 'p4_question', 'p4_retry', 'p4_closing_si', 'p4_closing_no', 'optout_bye']
+let allSurveySteps = []
+let editingSurveyStep = null
+
+async function loadSurveySteps() {
+  const rows = await api('/dashboard/api/survey-steps') || []
+  allSurveySteps = SURVEY_STEP_ORDER.map(s => rows.find(r => r.step === s)).filter(Boolean)
+  renderSurveyMainList()
+  renderSurveySideList()
+}
+
+function renderSurveyMainList() {
+  const el = document.getElementById('survey-main-list')
+  if (!el) return
+  el.innerHTML = allSurveySteps.map(s => `
+    <div class="auto-card">
+      <div class="auto-card-body">
+        <div class="auto-card-name">${esc(s.label)} ${s.options_locked ? '<span class="tag" style="background:var(--surface-2);color:var(--faint)">Botones fijos</span>' : ''}</div>
+        <div class="auto-card-reply">${esc(s.text)}</div>
+        ${(s.options||[]).length ? `<div class="auto-card-keywords" style="margin-top:8px">${s.options.map(o => `<span class="tag" style="background:var(--info-soft);color:var(--info)">${esc(o.label)}</span>`).join('')}</div>` : ''}
+      </div>
+      <div class="auto-card-actions">
+        <button class="icon-btn" onclick="openSurveyStepForm('${s.step}')" title="Editar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>`).join('')
+}
+
+function renderSurveySideList() {
+  const el = document.getElementById('survey-side-list')
+  if (!el) return
+  el.innerHTML = allSurveySteps.map(s => `
+    <div class="auto-row" onclick="openSurveyStepForm('${s.step}')">
+      <span class="auto-row-name">${esc(s.label)}</span>
+    </div>`).join('')
+}
+
+function openSurveyStepForm(step) {
+  const s = allSurveySteps.find(x => x.step === step)
+  if (!s) return
+  editingSurveyStep = step
+  document.getElementById('sf-title').textContent = s.label
+  document.getElementById('sf-text').value = s.text
+  document.getElementById('sf-hijo-hint').style.display = /\{\{hijo\}\}/.test(s.text) ? 'block' : 'none'
+  const optionsGroup = document.getElementById('sf-options-group')
+  const optionsEl = document.getElementById('sf-options')
+  if ((s.options||[]).length) {
+    optionsGroup.style.display = 'block'
+    document.getElementById('sf-locked-note').style.display = s.options_locked ? 'block' : 'none'
+    optionsEl.innerHTML = s.options.map((o, i) => `
+      <input class="field-input" style="margin-bottom:8px" data-idx="${i}" maxlength="20"
+        value="${esc(o.label)}" ${s.options_locked ? 'disabled' : ''} />`).join('')
+  } else {
+    optionsGroup.style.display = 'none'
+    optionsEl.innerHTML = ''
+  }
+  document.getElementById('survey-form-panel').classList.add('open')
+  document.getElementById('survey-form-overlay').classList.add('open')
+}
+
+function closeSurveyStepForm() {
+  document.getElementById('survey-form-panel').classList.remove('open')
+  document.getElementById('survey-form-overlay').classList.remove('open')
+  editingSurveyStep = null
+}
+
+async function submitSurveyStepForm() {
+  const s = allSurveySteps.find(x => x.step === editingSurveyStep)
+  if (!s) return
+  const text = document.getElementById('sf-text').value.trim()
+  if (!text) { showNotif('Falta el texto', 'Escribe el mensaje'); return }
+  const options = [...document.querySelectorAll('#sf-options input')].map(inp => ({ label: inp.value.trim() }))
+  const result = await api(`/dashboard/api/survey-steps/${editingSurveyStep}`, 'PUT', { text, options })
+  if (!result) return
+  closeSurveyStepForm()
+  loadSurveySteps()
+  showNotif('Mensaje actualizado', s.label)
+}
+
 const WA_CRED_LABELS = {
   WHATSAPP_TOKEN: 'Token de WhatsApp',
   PHONE_NUMBER_ID: 'ID del número',
@@ -1728,21 +1853,25 @@ function switchTab(name) {
   document.getElementById('tab-campaigns').classList.toggle('active', name==='campaigns')
   document.getElementById('tab-templates').classList.toggle('active', name==='templates')
   document.getElementById('tab-automations').classList.toggle('active', name==='automations')
+  document.getElementById('tab-survey').classList.toggle('active', name==='survey')
   document.getElementById('view-chats').style.display = name==='chats' ? 'flex' : 'none'
   document.getElementById('view-contacts').style.display = name==='contacts' ? 'flex' : 'none'
   document.getElementById('view-campaigns').style.display = name==='campaigns' ? 'flex' : 'none'
   document.getElementById('view-templates').style.display = name==='templates' ? 'flex' : 'none'
   document.getElementById('view-automations').style.display = name==='automations' ? 'flex' : 'none'
+  document.getElementById('view-survey').style.display = name==='survey' ? 'flex' : 'none'
   document.getElementById('home-pane').style.display = name==='home' ? 'flex' : 'none'
   document.getElementById('chat-pane').style.display = name==='chats' ? 'flex' : 'none'
   document.getElementById('campaign-pane').style.display = name==='campaigns' ? 'flex' : 'none'
   document.getElementById('templates-pane').style.display = name==='templates' ? 'flex' : 'none'
   document.getElementById('automations-pane').style.display = name==='automations' ? 'flex' : 'none'
+  document.getElementById('survey-pane').style.display = name==='survey' ? 'flex' : 'none'
   if (name === 'home') loadHome()
   if (name === 'contacts') loadContacts()
   if (name === 'campaigns') loadCampaigns()
   if (name === 'templates') loadTemplates()
   if (name === 'automations') loadAutomations()
+  if (name === 'survey') loadSurveySteps()
 }
 
 function autoResize(el) {

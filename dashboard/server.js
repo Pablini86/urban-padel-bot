@@ -16,7 +16,8 @@ import {
   createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus, deleteTemplate,
   createCampaign, getCampaigns, getCampaign, getCampaignContacts, getCampaignStats,
   addAudienceFromLabel, countLabelAudience, claimPendingCampaignContacts,
-  getAutomations, createAutomation, updateAutomation, setAutomationActive, deleteAutomation
+  getAutomations, createAutomation, updateAutomation, setAutomationActive, deleteAutomation,
+  getSurveySteps, updateSurveyStep
 } from '../db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -384,6 +385,21 @@ export async function initDashboard(app, conversations) {
   app.delete('/dashboard/api/automations/:id', auth, ah(async (req, res) => {
     await deleteAutomation(req.params.id)
     res.json({ ok: true })
+  }))
+
+  // Mensajes de la encuesta post-curso — ver comentario de la tabla survey_steps
+  // en db.js. El primer mensaje (con la pregunta de NPS) NO está aquí: vive en
+  // la plantilla aprobada por Meta, se edita creando una plantilla nueva.
+  app.get('/dashboard/api/survey-steps', auth, ah(async (req, res) => {
+    res.json(await getSurveySteps())
+  }))
+
+  app.put('/dashboard/api/survey-steps/:step', auth, express.json(), ah(async (req, res) => {
+    const { text, options } = req.body
+    if (!text?.trim()) return res.status(400).json({ error: 'Falta el texto del mensaje' })
+    const updated = await updateSurveyStep(req.params.step, { text: text.trim(), options })
+    if (!updated) return res.status(404).json({ error: 'No existe ese paso' })
+    res.json(updated)
   }))
 
   // Campañas

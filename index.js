@@ -32,12 +32,18 @@ app.post('/webhook', async (req, res) => {
   const message = value?.messages?.[0]
   if (!message) return
 
-  // Además de texto libre, aceptamos respuestas de botones de las preguntas de
-  // la encuesta (message.type === 'interactive') — sin esto, cualquier click en
-  // un botón de campaña se pierde en silencio.
+  // Además de texto libre, aceptamos respuestas de botones. Meta manda dos
+  // formatos distintos según de dónde vino el botón, y hay que cubrir los dos o
+  // el click se pierde en silencio:
+  // - type 'interactive' (botones que nosotros armamos con sendWhatsAppButtons,
+  //   ej. las preguntas p2/p3/p4 de la encuesta)
+  // - type 'button' (quick-replies horneados en una plantilla aprobada, ej. la
+  //   pregunta de NPS que va pegada al primer mensaje de la campaña) — este es
+  //   el que faltaba, por eso el primer botón que ve alguien nunca hacía nada.
   let text = null
   if (message.type === 'text') text = message.text.body
   else if (message.type === 'interactive' && message.interactive?.button_reply) text = message.interactive.button_reply.title
+  else if (message.type === 'button' && message.button) text = message.button.text
   if (text === null) return
 
   const from = normalizeMxPhone(message.from)
