@@ -644,12 +644,15 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
 <div class="info-overlay" id="template-form-overlay" onclick="closeTemplateForm()"></div>
 <div class="info-panel" id="template-form-panel">
   <div class="info-head">
-    <div class="info-title">Nueva plantilla</div>
+    <div class="info-title" id="tf-title">Nueva plantilla</div>
     <button class="icon-btn" onclick="closeTemplateForm()">
       <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
   </div>
   <div class="info-body">
+    <div class="field-group" id="tf-edit-note" style="display:none">
+      <div class="field-static" style="font-size:12px">Estás editando una plantilla ya mandada a Meta — el nombre y la categoría no se pueden cambiar, y hay que volver a poner un ejemplo por cada variable (no se guardaron de la vez pasada). Al guardar, Meta vuelve a revisar el contenido, pero la versión aprobada actual se sigue usando para enviar mientras tanto.</div>
+    </div>
     <div class="field-group">
       <div class="field-label">Imagen (opcional)</div>
       <label class="img-drop" id="tf-img-drop">
@@ -690,7 +693,7 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
     </div>
   </div>
   <div class="info-footer">
-    <button class="save-btn" onclick="createTemplateSubmit()">Mandar a revisión de Meta</button>
+    <button class="save-btn" id="tf-submit-btn" onclick="submitTemplateForm()">Mandar a revisión de Meta</button>
   </div>
 </div>
 
@@ -1370,6 +1373,7 @@ function closeCampaignForm() {
 }
 
 let pendingHeaderImageBase64 = null
+let editingTemplateId = null
 
 function goCreateTemplateFromCampaign() {
   closeCampaignForm()
@@ -1377,15 +1381,31 @@ function goCreateTemplateFromCampaign() {
   openTemplateForm()
 }
 
-function openTemplateForm() {
-  document.getElementById('nt-name').value = ''
-  document.getElementById('nt-category').value = 'UTILITY'
-  document.getElementById('nt-variables').value = ''
+// Sin id: formulario en blanco para mandar una plantilla nueva a Meta. Con id:
+// precarga el texto de una ya mandada para editarla en el mismo lugar (nombre
+// y categoría se bloquean — Meta no permite cambiarlos en una edición).
+function openTemplateForm(id) {
+  const t = id ? allTemplates.find(x => x.id === id) : null
+  editingTemplateId = t ? t.id : null
+
+  document.getElementById('tf-title').textContent = t ? 'Editar plantilla' : 'Nueva plantilla'
+  document.getElementById('tf-edit-note').style.display = t ? 'block' : 'none'
+  document.getElementById('tf-submit-btn').textContent = t ? 'Guardar y volver a mandar a revisión' : 'Mandar a revisión de Meta'
+
+  document.getElementById('nt-name').value = t ? t.name : ''
+  document.getElementById('nt-name').disabled = !!t
+  document.getElementById('nt-category').value = t ? t.category : 'UTILITY'
+  document.getElementById('nt-category').disabled = !!t
+  document.getElementById('nt-variables').value = t ? (t.variables || []).join(' | ') : ''
   document.getElementById('nt-examples').value = ''
-  document.getElementById('nt-buttons').value = ''
-  document.getElementById('nt-preview').value = ''
+  document.getElementById('nt-buttons').value = t ? (t.buttons || []).join(' | ') : ''
+  document.getElementById('nt-preview').value = t ? t.body_preview || '' : ''
   document.getElementById('tf-img-url').value = ''
   resetTemplateImagePreview()
+  if (t?.header_image_url && !t.header_image_url.startsWith('data:')) {
+    document.getElementById('tf-img-url').value = t.header_image_url
+    onTemplateImageUrl()
+  }
   document.getElementById('template-form-panel').classList.add('open')
   document.getElementById('template-form-overlay').classList.add('open')
 }
@@ -1439,7 +1459,7 @@ function onTemplateImageUrl() {
   document.getElementById('tf-img-preview').innerHTML = `<img src="${esc(url)}" alt="Vista previa" />`
 }
 
-async function createTemplateSubmit() {
+async function submitTemplateForm() {
   const name = normalizeTemplateName(document.getElementById('nt-name').value.trim())
   const bodyPreview = document.getElementById('nt-preview').value.trim()
   if (!name || !bodyPreview) { showNotif('Falta información', 'Ponle nombre y el texto del mensaje'); return }
@@ -1457,8 +1477,7 @@ async function createTemplateSubmit() {
     return
   }
 
-  const template = await api('/dashboard/api/templates', 'POST', {
-    name,
+  const body = {
     category: document.getElementById('nt-category').value,
     variables: document.getElementById('nt-variables').value,
     examples: examplesRaw,
@@ -1466,7 +1485,22 @@ async function createTemplateSubmit() {
     bodyPreview,
     headerImageBase64: pendingHeaderImageBase64,
     headerImageUrl: pendingHeaderImageBase64 ? null : document.getElementById('tf-img-url').value.trim()
-  })
+  }
+
+  if (editingTemplateId) {
+    const r = await fetch(`/dashboard/api/templates/${editingTemplateId}`, {
+      method: 'PUT', headers: { 'x-token': token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok) { showNotif('No se pudo editar', data.error || 'Intenta de nuevo', true); return }
+    closeTemplateForm()
+    loadTemplates()
+    showNotif('Mandada a revisión otra vez', 'La versión aprobada sigue activa mientras Meta revisa el cambio')
+    return
+  }
+
+  const template = await api('/dashboard/api/templates', 'POST', { ...body, name })
   if (!template) return
   closeTemplateForm()
   loadTemplates()
@@ -1513,6 +1547,7 @@ function renderTemplatesGallery() {
           <span class="tag" style="background:${color}22;color:${color}">${label}</span>
           <span class="tag" style="background:var(--faint)22;color:var(--faint)">${esc(t.category || 'UTILITY')}</span>
           ${canRefresh ? `<span class="label-add" style="font-size:10.5px;padding:3px 9px" onclick="refreshTemplateStatus(${t.id})">Verificar</span>` : ''}
+          ${t.meta_template_id ? `<span class="label-add" style="font-size:10.5px;padding:3px 9px" onclick="event.stopPropagation();openTemplateForm(${t.id})">Editar</span>` : ''}
           <span class="label-add" style="font-size:10.5px;padding:3px 9px;color:var(--danger);border-color:var(--danger)" onclick="event.stopPropagation();deleteTemplateConfirm(${t.id})">Borrar</span>
         </div>
       </div>

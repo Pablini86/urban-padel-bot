@@ -421,6 +421,18 @@ export async function setTemplateSubmitted(id, { metaTemplateId, status, categor
   )
 }
 
+// Edita el contenido de una plantilla YA aprobada (mismo meta_template_id, mismo
+// nombre) en vez de crear una nueva — Meta la vuelve a mandar a revisión pero la
+// versión aprobada anterior se sigue usando para enviar mientras tanto. Guarda el
+// texto editado localmente aunque la llamada a Meta falle, para no perder lo que
+// se escribió en el formulario.
+export async function updateTemplateContent(id, { bodyPreview, variables, buttons, headerImageUrl }) {
+  await pool.query(
+    `UPDATE templates SET body_preview = $2, variables = $3, buttons = $4, header_image_url = $5 WHERE id = $1`,
+    [id, bodyPreview, variables || [], buttons || [], headerImageUrl || null]
+  )
+}
+
 // Falla si ya tiene una campaña creada (la FK a campaigns lo impediría de todos
 // modos, pero así el dashboard muestra un mensaje legible en vez de un 500).
 export async function deleteTemplate(id) {

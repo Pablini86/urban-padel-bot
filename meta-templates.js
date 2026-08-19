@@ -105,6 +105,34 @@ export async function submitTemplateToMeta({ name, language, category, bodyText,
   return { metaTemplateId: data.id, status: (data.status || 'PENDING').toLowerCase(), category: data.category || category }
 }
 
+// Edita el contenido de una plantilla YA aprobada, en vez de crear una nueva con
+// otro nombre. Nombre e idioma son inmutables — solo se puede cambiar el
+// contenido (texto/botones/header). Meta manda la edición a revisión, pero la
+// versión aprobada anterior se sigue usando para enviar mensajes mientras tanto,
+// así que esto no interrumpe una campaña en curso.
+export async function editTemplateOnMeta(metaTemplateId, { bodyText, variableExamples, buttons, headerHandle }) {
+  const token = process.env.WHATSAPP_MGMT_TOKEN
+  if (!token) throw new Error('Falta WHATSAPP_MGMT_TOKEN')
+
+  const res = await fetch(`${API}/${metaTemplateId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      components: buildComponents({ bodyText, variableExamples, buttons, headerHandle })
+    })
+  })
+
+  const data = await safeJson(res)
+  if (!res.ok || data.success === false) {
+    const detail = data?.error?.error_user_msg || data?.error?.message || JSON.stringify(data)
+    throw new Error(`Meta rechazó la edición de la plantilla: ${detail}`)
+  }
+  return { status: 'pendiente' }
+}
+
 export async function checkTemplateStatus(metaTemplateId) {
   const token = process.env.WHATSAPP_MGMT_TOKEN
   if (!token) throw new Error('Falta WHATSAPP_MGMT_TOKEN')

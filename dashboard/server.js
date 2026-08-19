@@ -4,7 +4,7 @@ import { Server } from 'socket.io'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { sendWhatsApp, getWhatsAppBusinessInfo } from '../whatsapp.js'
-import { submitTemplateToMeta, checkTemplateStatus, uploadTemplateHeaderImage } from '../meta-templates.js'
+import { submitTemplateToMeta, editTemplateOnMeta, checkTemplateStatus, uploadTemplateHeaderImage } from '../meta-templates.js'
 import { parseCsv } from '../csv.js'
 import { normalizeMxPhone } from '../phone.js'
 import { sendClaimedBatch } from '../encuesta.js'
@@ -14,6 +14,7 @@ import {
   createContact, setContactOptIn, deleteContact, getContactCampaigns,
   saveMessage, getMessages, getRecentConversations,
   createTemplate, getTemplates, getTemplate, setTemplateSubmitted, setTemplateError, setTemplateStatus, deleteTemplate,
+  updateTemplateContent,
   createCampaign, getCampaigns, getCampaign, getCampaignContacts, getCampaignStats,
   addAudienceFromLabel, countLabelAudience, claimPendingCampaignContacts,
   getAutomations, createAutomation, updateAutomation, setAutomationActive, deleteAutomation,
@@ -319,6 +320,62 @@ export async function initDashboard(app, conversations) {
       await setTemplateSubmitted(template.id, { metaTemplateId, status, category: metaCategory })
     } catch (err) {
       await setTemplateError(template.id, err.message)
+    }
+
+    res.json(await getTemplate(template.id))
+  }))
+
+  // Edita el texto/botones/imagen de una plantilla YA mandada a Meta — mismo
+  // nombre e idioma (Meta no permite cambiarlos), Meta la vuelve a mandar a
+  // revisión pero la versión aprobada sigue enviándose mientras tanto, así que
+  // esto no interrumpe una campaña en curso.
+  app.put('/dashboard/api/templates/:id', auth, express.json({ limit: '10mb' }), ah(async (req, res) => {
+    const template = await getTemplate(req.params.id)
+    if (!template) return res.status(404).json({ error: 'No existe esa plantilla' })
+    if (!template.meta_template_id) return res.status(400).json({ error: 'Esta plantilla nunca se mandó a Meta — bórrala y créala de nuevo' })
+
+    const { bodyPreview, variables, buttons, examples, headerImageUrl, headerImageBase64 } = req.body
+    if (!bodyPreview?.trim()) return res.status(400).json({ error: 'Falta el texto del mensaje' })
+    const variableList = (variables || '').split('|').map(v => v.trim()).filter(Boolean)
+    const buttonList = (buttons || '').split('|').map(v => v.trim()).filter(Boolean)
+    const exampleList = (examples || '').split('|').map(v => v.trim()).filter(Boolean)
+
+    const placeholderError = validatePlaceholders(bodyPreview.trim(), exampleList)
+    if (placeholderError) return res.status(400).json({ error: placeholderError })
+
+    // Si no se sube una imagen nueva en el formulario de edición, hay que
+    // re-mandar la que ya tenía — Meta trata los componentes que no vienen en
+    // la edición como quitados, así que omitir el header lo borraría del todo.
+    let imageInput = { headerImageUrl, headerImageBase64 }
+    if (!headerImageUrl && !headerImageBase64 && template.header_image_url) {
+      imageInput = template.header_image_url.startsWith('data:')
+        ? { headerImageBase64: template.header_image_url }
+        : { headerImageUrl: template.header_image_url }
+    }
+
+    let image = null
+    try {
+      image = await resolveHeaderImage(imageInput)
+    } catch (err) {
+      return res.status(400).json({ error: err.message })
+    }
+
+    await updateTemplateContent(template.id, {
+      bodyPreview: bodyPreview.trim(), variables: variableList, buttons: buttonList,
+      headerImageUrl: image?.displayUrl || null
+    })
+
+    try {
+      let headerHandle = null
+      if (image) headerHandle = await uploadTemplateHeaderImage(image)
+      const { status } = await editTemplateOnMeta(template.meta_template_id, {
+        bodyText: bodyPreview.trim(), variableExamples: exampleList, buttons: buttonList, headerHandle
+      })
+      await setTemplateStatus(template.id, { status, rejectedReason: null })
+    } catch (err) {
+      // El texto ya se guardó localmente aunque Meta rechace la edición — así
+      // no se pierde lo escrito y se puede reintentar sin volver a capturarlo.
+      return res.status(502).json({ error: err.message })
     }
 
     res.json(await getTemplate(template.id))
