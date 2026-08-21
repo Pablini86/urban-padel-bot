@@ -1726,7 +1726,7 @@ async function deleteAutomationConfirm(id) {
 
 // Orden real de la conversación — el orden alfabético del `step` en la BD no
 // sirve para esto (ej. p4_closing_no quedaría antes que p4_question).
-const SURVEY_STEP_ORDER = ['p1_nps_retry', 'p2_question', 'p2_retry', 'p3_question', 'p4_question', 'p4_retry', 'p4_closing_si', 'p4_closing_no', 'optout_bye']
+const SURVEY_STEP_ORDER = ['p1_nps_retry', 'p2_question', 'p2_retry', 'p3_question', 'p4_question', 'p4_retry', 'p4_closing_si', 'p4_closing_ya_esta', 'p4_closing_no', 'optout_bye']
 let allSurveySteps = []
 let editingSurveyStep = null
 

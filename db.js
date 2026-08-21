@@ -185,6 +185,8 @@ export async function initDB() {
       text: 'Perfecto, en breve un profe te contacta para acomodarlo en el grupo de su edad. Cualquier duda, aquí estamos.', options: [] },
     { step: 'p4_closing_no', label: 'Cierre — si no le interesa por ahora', locked: false,
       text: 'Gracias por tu tiempo. Si algún día quieres info de la clínica, escríbenos por aquí.', options: [] },
+    { step: 'p4_closing_ya_esta', label: 'Cierre — si ya están en la clínica', locked: false,
+      text: '¡Qué bueno que ya están con nosotros! Cualquier duda de horarios o grupos, aquí estamos.', options: [] },
     { step: 'optout_bye', label: 'Respuesta cuando alguien se da de baja', locked: false,
       text: 'Listo, no te vamos a volver a escribir para campañas. Si necesitas algo del club, aquí seguimos.', options: [] }
   ]
@@ -194,6 +196,16 @@ export async function initDB() {
       [s.step, s.label, s.text, JSON.stringify(s.options), s.locked]
     )
   }
+
+  // Migración puntual (2026-08-21): p4_question gana un tercer botón ("ya están
+  // en la clínica") — el ON CONFLICT DO NOTHING de arriba no toca filas que ya
+  // existían en producción con solo 2 opciones, así que hay que agregarla aquí.
+  // Se agrega SOLO si sigue en 2 (nunca pisa las labels que Pablo ya haya
+  // editado para sí/no, y es idempotente: una vez en 3 ya no vuelve a matchear).
+  await pool.query(
+    `UPDATE survey_steps SET options = options || $2::jsonb WHERE step = $1 AND jsonb_array_length(options) = 2`,
+    ['p4_question', JSON.stringify([{ value: 'ya_esta', label: 'Ya están, gracias' }])]
+  )
 
   console.log('[DB] Inicializada correctamente')
 }

@@ -194,7 +194,9 @@ export async function handleSurveyReply(contact, phone, name, text) {
       retryCount.delete(retryKey)
       await saveCampaignResponse({ campaignContactId: contact.id, pregunta: 'clinica', valor: match || 'sin_respuesta' })
 
-      const closingStep = match === 'si' ? steps.p4_closing_si : steps.p4_closing_no
+      const closingStep = match === 'si' ? steps.p4_closing_si
+        : match === 'ya_esta' ? steps.p4_closing_ya_esta
+        : steps.p4_closing_no
       await sendWhatsApp(phone, closingStep.text, await resolveStepImageId(closingStep))
       await logOutbound(phone, closingStep.text)
       await advanceCampaignContact(contact.id, { pasoActual: 'cierre', estado: 'completado' })
