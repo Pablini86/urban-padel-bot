@@ -738,6 +738,18 @@ textarea.field-input{resize:none;height:76px;line-height:1.5}
   </div>
   <div class="info-body">
     <div class="field-group">
+      <div class="field-label">Imagen (opcional)</div>
+      <label class="img-drop" id="sf-img-drop">
+        <input type="file" accept="image/*" id="sf-img-file" style="display:none" onchange="onStepImageFile(event)" />
+        <div id="sf-img-preview" class="img-drop-preview">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="img-drop-text">Sube una foto para este mensaje</div>
+        </div>
+      </label>
+      <input type="text" class="field-input" id="sf-img-url" placeholder="...o pega la URL de una imagen" style="margin-top:8px" oninput="onStepImageUrl()" />
+      <div class="field-static" style="margin-top:6px;font-size:12px">Se recorta sola al formato horizontal de WhatsApp antes de mandarla.</div>
+    </div>
+    <div class="field-group">
       <div class="field-label">Texto del mensaje</div>
       <textarea class="field-input" id="sf-text" style="height:100px"></textarea>
       <div class="field-static" id="sf-hijo-hint" style="margin-top:6px;font-size:12px;display:none">Puedes usar <code>{{hijo}}</code> donde quieras que vaya el nombre del hijo (o "tus hijos" si son varios).</div>
@@ -1403,9 +1415,14 @@ function openTemplateForm(id) {
   document.getElementById('nt-preview').value = t ? t.body_preview || '' : ''
   document.getElementById('tf-img-url').value = ''
   resetTemplateImagePreview()
-  if (t?.header_image_url && !t.header_image_url.startsWith('data:')) {
-    document.getElementById('tf-img-url').value = t.header_image_url
-    onTemplateImageUrl()
+  if (t?.header_image_url) {
+    if (t.header_image_url.startsWith('data:')) {
+      pendingHeaderImageBase64 = t.header_image_url
+      document.getElementById('tf-img-preview').innerHTML = `<img src="${t.header_image_url}" alt="Vista previa" />`
+    } else {
+      document.getElementById('tf-img-url').value = t.header_image_url
+      onTemplateImageUrl()
+    }
   }
   document.getElementById('template-form-panel').classList.add('open')
   document.getElementById('template-form-overlay').classList.add('open')
@@ -1725,6 +1742,7 @@ function renderSurveyMainList() {
   if (!el) return
   el.innerHTML = allSurveySteps.map(s => `
     <div class="auto-card">
+      ${s.image_url ? `<img src="${esc(s.image_url)}" style="width:100%;max-width:220px;aspect-ratio:1.91/1;object-fit:cover;border-radius:var(--r-sm);margin-bottom:8px" alt="">` : ''}
       <div class="auto-card-body">
         <div class="auto-card-name">${esc(s.label)} ${s.options_locked ? '<span class="tag" style="background:var(--surface-2);color:var(--faint)">Botones fijos</span>' : ''}</div>
         <div class="auto-card-reply">${esc(s.text)}</div>
@@ -1747,11 +1765,52 @@ function renderSurveySideList() {
     </div>`).join('')
 }
 
+function resetStepImagePreview() {
+  pendingStepImageBase64 = null
+  document.getElementById('sf-img-file').value = ''
+  document.getElementById('sf-img-preview').innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="img-drop-text">Sube una foto para este mensaje</div>`
+}
+
+function onStepImageFile(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    pendingStepImageBase64 = reader.result
+    document.getElementById('sf-img-url').value = ''
+    document.getElementById('sf-img-preview').innerHTML = `<img src="${reader.result}" alt="Vista previa" />`
+  }
+  reader.readAsDataURL(file)
+}
+
+function onStepImageUrl() {
+  const url = document.getElementById('sf-img-url').value.trim()
+  if (!url) { resetStepImagePreview(); return }
+  pendingStepImageBase64 = null
+  document.getElementById('sf-img-file').value = ''
+  document.getElementById('sf-img-preview').innerHTML = `<img src="${esc(url)}" alt="Vista previa" />`
+}
+
+let pendingStepImageBase64 = null
+
 function openSurveyStepForm(step) {
   const s = allSurveySteps.find(x => x.step === step)
   if (!s) return
   editingSurveyStep = step
   document.getElementById('sf-title').textContent = s.label
+  document.getElementById('sf-img-url').value = ''
+  resetStepImagePreview()
+  if (s.image_url) {
+    if (s.image_url.startsWith('data:')) {
+      pendingStepImageBase64 = s.image_url
+      document.getElementById('sf-img-preview').innerHTML = `<img src="${s.image_url}" alt="Vista previa" />`
+    } else {
+      document.getElementById('sf-img-url').value = s.image_url
+      onStepImageUrl()
+    }
+  }
   document.getElementById('sf-text').value = s.text
   document.getElementById('sf-hijo-hint').style.display = /\{\{hijo\}\}/.test(s.text) ? 'block' : 'none'
   const optionsGroup = document.getElementById('sf-options-group')
@@ -1782,7 +1841,12 @@ async function submitSurveyStepForm() {
   const text = document.getElementById('sf-text').value.trim()
   if (!text) { showNotif('Falta el texto', 'Escribe el mensaje'); return }
   const options = [...document.querySelectorAll('#sf-options input')].map(inp => ({ label: inp.value.trim() }))
-  const result = await api(`/dashboard/api/survey-steps/${editingSurveyStep}`, 'PUT', { text, options })
+  const body = {
+    text, options,
+    imageBase64: pendingStepImageBase64,
+    imageUrl: pendingStepImageBase64 ? null : document.getElementById('sf-img-url').value.trim()
+  }
+  const result = await api(`/dashboard/api/survey-steps/${editingSurveyStep}`, 'PUT', body)
   if (!result) return
   closeSurveyStepForm()
   loadSurveySteps()

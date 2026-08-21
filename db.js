@@ -139,6 +139,11 @@ export async function initDB() {
       options_locked BOOLEAN NOT NULL DEFAULT false,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+    -- image_url: foto opcional del paso, guardada como data URI ya recortada al
+    -- formato horizontal de WhatsApp (ver resolveHeaderImage en dashboard/server.js,
+    -- reusado para plantillas y para estos pasos). encuesta.js la sube a Meta con
+    -- uploadWhatsAppMedia justo antes de mandar el mensaje.
+    ALTER TABLE survey_steps ADD COLUMN IF NOT EXISTS image_url TEXT;
   `)
 
   // Insertar etiquetas por defecto
@@ -204,7 +209,7 @@ export async function getSurveyStepsMap() {
   return Object.fromEntries(rows.map(r => [r.step, r]))
 }
 
-export async function updateSurveyStep(step, { text, options }) {
+export async function updateSurveyStep(step, { text, options, imageUrl }) {
   const existing = await pool.query(`SELECT options_locked, options FROM survey_steps WHERE step = $1`, [step])
   if (!existing.rows[0]) return null
   // Los `value` internos de las opciones nunca se editan desde el dashboard —
@@ -216,9 +221,9 @@ export async function updateSurveyStep(step, { text, options }) {
     nextOptions = existing.rows[0].options.map((o, i) => ({ value: o.value, label: String(options[i]?.label || o.label).trim().slice(0, 20) }))
   }
   const r = await pool.query(`
-    UPDATE survey_steps SET text = $2, options = $3, updated_at = NOW() WHERE step = $1
+    UPDATE survey_steps SET text = $2, options = $3, image_url = $4, updated_at = NOW() WHERE step = $1
     RETURNING *
-  `, [step, text, JSON.stringify(nextOptions)])
+  `, [step, text, JSON.stringify(nextOptions), imageUrl || null])
   return r.rows[0]
 }
 

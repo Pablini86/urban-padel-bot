@@ -4,7 +4,7 @@
 // — los nombres de pregunta/paso vienen de ahí, pero "inicio" y "p1_nps" se
 // colapsaron en uno solo porque la plantilla aprobada ya trae la pregunta de NPS
 // (y sus botones) en el mismo mensaje que la saluda.
-import { sendWhatsAppTemplate, sendWhatsAppButtons, sendWhatsApp } from './whatsapp.js'
+import { sendWhatsAppTemplate, sendWhatsAppButtons, sendWhatsApp, resolveMediaId } from './whatsapp.js'
 import {
   getCampaign, markContactSent, markContactFailed, advanceCampaignContact,
   saveCampaignResponse, addOptOut, saveMessage, upsertContact, getSurveyStepsMap
@@ -44,6 +44,20 @@ function matchOption(text, options) {
 
 function toButtons(options) {
   return (options || []).map(o => ({ id: o.value, title: o.label }))
+}
+
+// A diferencia del header de una plantilla (donde una imagen faltante rompe el
+// envío porque Meta espera ese parámetro), aquí preferimos mandar el mensaje sin
+// foto antes que tumbar el flujo completo de la encuesta por un error subiendo
+// una imagen.
+async function resolveStepImageId(step) {
+  if (!step?.image_url) return null
+  try {
+    return await resolveMediaId(step.image_url)
+  } catch (err) {
+    console.error('[Encuesta] Error subiendo imagen del paso, mando el mensaje sin foto:', err.message)
+    return null
+  }
 }
 
 function renderTemplate(text, vars) {
@@ -97,9 +111,9 @@ export async function handleSurveyReply(contact, phone, name, text) {
   if (OPT_OUT_RE.test(text)) {
     await addOptOut(phone)
     await advanceCampaignContact(contact.id, { estado: 'opt_out' })
-    const bye = steps.optout_bye.text
-    await sendWhatsApp(phone, bye)
-    await logOutbound(phone, bye)
+    const byeStep = steps.optout_bye
+    await sendWhatsApp(phone, byeStep.text, await resolveStepImageId(byeStep))
+    await logOutbound(phone, byeStep.text)
     return
   }
 
@@ -117,7 +131,7 @@ export async function handleSurveyReply(contact, phone, name, text) {
       if (num === null && !alreadyRetried) {
         retryCount.set(retryKey, 1)
         const step = steps.p1_nps_retry
-        await sendWhatsAppButtons(phone, step.text, toButtons(step.options))
+        await sendWhatsAppButtons(phone, step.text, toButtons(step.options), await resolveStepImageId(step))
         await logOutbound(phone, step.text)
         return
       }
@@ -128,7 +142,7 @@ export async function handleSurveyReply(contact, phone, name, text) {
       const intro = num !== null && num >= 9 ? '¡Nos alegra muchísimo! ' : num !== null && num <= 6 ? 'Gracias por la honestidad, nos sirve mucho. ' : ''
       const step = steps.p2_question
       const q = intro + renderTemplate(step.text, { hijo: hijoCorto })
-      await sendWhatsAppButtons(phone, q, toButtons(step.options))
+      await sendWhatsAppButtons(phone, q, toButtons(step.options), await resolveStepImageId(step))
       await logOutbound(phone, q)
       await advanceCampaignContact(contact.id, { pasoActual: 'p2_reinscribe', estado: 'en_curso' })
       return
@@ -140,17 +154,18 @@ export async function handleSurveyReply(contact, phone, name, text) {
       if (!match && !alreadyRetried) {
         retryCount.set(retryKey, 1)
         const hijoCorto = personalizarHijo(contact.vars)
-        const q = renderTemplate(steps.p2_retry.text, { hijo: hijoCorto })
-        await sendWhatsAppButtons(phone, q, toButtons(p2.options))
+        const retryStep = steps.p2_retry
+        const q = renderTemplate(retryStep.text, { hijo: hijoCorto })
+        await sendWhatsAppButtons(phone, q, toButtons(p2.options), await resolveStepImageId(retryStep))
         await logOutbound(phone, q)
         return
       }
       retryCount.delete(retryKey)
       await saveCampaignResponse({ campaignContactId: contact.id, pregunta: 'reinscribe', valor: match || 'sin_respuesta' })
 
-      const q = steps.p3_question.text
-      await sendWhatsApp(phone, q)
-      await logOutbound(phone, q)
+      const p3 = steps.p3_question
+      await sendWhatsApp(phone, p3.text, await resolveStepImageId(p3))
+      await logOutbound(phone, p3.text)
       await advanceCampaignContact(contact.id, { pasoActual: 'p3_mejora' })
       return
     }
@@ -160,7 +175,7 @@ export async function handleSurveyReply(contact, phone, name, text) {
       await saveCampaignResponse({ campaignContactId: contact.id, pregunta: 'mejora', valor: text })
 
       const step = steps.p4_question
-      await sendWhatsAppButtons(phone, step.text, toButtons(step.options))
+      await sendWhatsAppButtons(phone, step.text, toButtons(step.options), await resolveStepImageId(step))
       await logOutbound(phone, step.text)
       await advanceCampaignContact(contact.id, { pasoActual: 'p4_clinica' })
       return
@@ -171,17 +186,17 @@ export async function handleSurveyReply(contact, phone, name, text) {
       const match = matchOption(text, p4.options)
       if (!match && !alreadyRetried) {
         retryCount.set(retryKey, 1)
-        const q = steps.p4_retry.text
-        await sendWhatsAppButtons(phone, q, toButtons(p4.options))
-        await logOutbound(phone, q)
+        const retryStep = steps.p4_retry
+        await sendWhatsAppButtons(phone, retryStep.text, toButtons(p4.options), await resolveStepImageId(retryStep))
+        await logOutbound(phone, retryStep.text)
         return
       }
       retryCount.delete(retryKey)
       await saveCampaignResponse({ campaignContactId: contact.id, pregunta: 'clinica', valor: match || 'sin_respuesta' })
 
-      const closing = match === 'si' ? steps.p4_closing_si.text : steps.p4_closing_no.text
-      await sendWhatsApp(phone, closing)
-      await logOutbound(phone, closing)
+      const closingStep = match === 'si' ? steps.p4_closing_si : steps.p4_closing_no
+      await sendWhatsApp(phone, closingStep.text, await resolveStepImageId(closingStep))
+      await logOutbound(phone, closingStep.text)
       await advanceCampaignContact(contact.id, { pasoActual: 'cierre', estado: 'completado' })
       return
     }

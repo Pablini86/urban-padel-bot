@@ -473,10 +473,20 @@ export async function initDashboard(app, conversations) {
     res.json(await getSurveySteps())
   }))
 
-  app.put('/dashboard/api/survey-steps/:step', auth, express.json(), ah(async (req, res) => {
-    const { text, options } = req.body
+  // Límite alto por la misma razón que en /templates: imageBase64 puede traer
+  // una foto completa como data URI.
+  app.put('/dashboard/api/survey-steps/:step', auth, express.json({ limit: '10mb' }), ah(async (req, res) => {
+    const { text, options, imageUrl, imageBase64 } = req.body
     if (!text?.trim()) return res.status(400).json({ error: 'Falta el texto del mensaje' })
-    const updated = await updateSurveyStep(req.params.step, { text: text.trim(), options })
+
+    let image = null
+    try {
+      image = await resolveHeaderImage({ headerImageUrl: imageUrl, headerImageBase64: imageBase64 })
+    } catch (err) {
+      return res.status(400).json({ error: err.message })
+    }
+
+    const updated = await updateSurveyStep(req.params.step, { text: text.trim(), options, imageUrl: image?.displayUrl })
     if (!updated) return res.status(404).json({ error: 'No existe ese paso' })
     res.json(updated)
   }))
