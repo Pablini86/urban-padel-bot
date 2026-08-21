@@ -1,6 +1,7 @@
 import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
+import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { sendWhatsApp, getWhatsAppBusinessInfo } from '../whatsapp.js'
@@ -241,23 +242,44 @@ export async function initDashboard(app, conversations) {
     res.json(await getTemplates())
   }))
 
+  // Formato horizontal recomendado por Meta para header images (1.91:1, mismo
+  // ratio que usa el link preview) — Pablo pidió que las fotos "queden chicas y
+  // horizontales" en vez de tener que recortarlas él a mano antes de subirlas.
+  const HEADER_IMG_WIDTH = 1125
+  const HEADER_IMG_HEIGHT = 600
+
   // Descarga o decodifica la imagen de header antes de mandarla a Meta. Acepta
   // una URL externa (headerImageUrl) o un archivo ya convertido a data URI en el
   // navegador (headerImageBase64) — lo que haya puesto el agente en el formulario.
+  // Cualquiera de las dos se recorta/redimensiona sola al formato horizontal de
+  // WhatsApp con sharp ("cover", sin deformar), así el preview que se guarda ya
+  // es exactamente la imagen que se manda a Meta.
   async function resolveHeaderImage({ headerImageUrl, headerImageBase64 }) {
+    let rawBuffer
     if (headerImageBase64) {
       const match = /^data:(.+?);base64,(.+)$/.exec(headerImageBase64)
       if (!match) throw new Error('La imagen subida no tiene un formato válido')
-      return { buffer: Buffer.from(match[2], 'base64'), mimeType: match[1], displayUrl: headerImageBase64 }
-    }
-    if (headerImageUrl) {
+      rawBuffer = Buffer.from(match[2], 'base64')
+    } else if (headerImageUrl) {
       const imgRes = await fetch(headerImageUrl)
       if (!imgRes.ok) throw new Error(`No se pudo descargar la imagen de la URL (HTTP ${imgRes.status})`)
-      const mimeType = imgRes.headers.get('content-type') || 'image/jpeg'
-      const buffer = Buffer.from(await imgRes.arrayBuffer())
-      return { buffer, mimeType, displayUrl: headerImageUrl }
+      rawBuffer = Buffer.from(await imgRes.arrayBuffer())
+    } else {
+      return null
     }
-    return null
+
+    let buffer
+    try {
+      buffer = await sharp(rawBuffer)
+        .resize(HEADER_IMG_WIDTH, HEADER_IMG_HEIGHT, { fit: 'cover', position: 'attention' })
+        .jpeg({ quality: 85 })
+        .toBuffer()
+    } catch (err) {
+      throw new Error('No se pudo procesar la imagen — prueba con otra foto (JPG o PNG)')
+    }
+    const mimeType = 'image/jpeg'
+    const displayUrl = `data:${mimeType};base64,${buffer.toString('base64')}`
+    return { buffer, mimeType, displayUrl }
   }
 
   // Meta exige minúsculas, números y guion bajo únicamente — el formulario ya
